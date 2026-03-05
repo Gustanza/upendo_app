@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:upendo_app/views/home_dashboard.dart';
 import 'package:upendo_app/views/welcome_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -6,12 +8,20 @@ import 'firebase_options.dart';
 // ...
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const NguvuYaUpendoApp());
+  FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    if (user == null) {
+      runApp(const NguvuYaUpendoApp(isSignedIn: false));
+    } else {
+      runApp(const NguvuYaUpendoApp(isSignedIn: true));
+    }
+  });
 }
 
 class NguvuYaUpendoApp extends StatelessWidget {
-  const NguvuYaUpendoApp({super.key});
+  final bool isSignedIn;
+  const NguvuYaUpendoApp({super.key, required this.isSignedIn});
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +51,7 @@ class NguvuYaUpendoApp extends StatelessWidget {
           color: Colors.white,
         ),
       ),
-      home: const WelcomeScreen(),
+      home: isSignedIn ? const HomeDashboard() : const WelcomeScreen(),
     );
   }
 }
