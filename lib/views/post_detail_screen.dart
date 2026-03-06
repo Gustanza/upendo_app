@@ -3,6 +3,7 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../models/post_model.dart';
+import '../services/user_preferences.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostModel post;
@@ -16,12 +17,40 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
   bool _isPlayerInitialized = false;
+  final UserPreferences _userPreferences = UserPreferences();
+  bool _isSaved = false;
 
   @override
   void initState() {
     super.initState();
     if (widget.post.type == 'video' || widget.post.type == 'audio') {
       _initializePlayer();
+    }
+    _checkSavedStatus();
+  }
+
+  Future<void> _checkSavedStatus() async {
+    final saved = await _userPreferences.isPostSaved(widget.post.id);
+    if (mounted) {
+      setState(() {
+        _isSaved = saved;
+      });
+    }
+  }
+
+  Future<void> _toggleSave() async {
+    await _userPreferences.toggleSavePost(widget.post.id);
+    final saved = await _userPreferences.isPostSaved(widget.post.id);
+    if (mounted) {
+      setState(() {
+        _isSaved = saved;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isSaved ? 'Imehifadhiwa!' : 'Imeondolewa!'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
     }
   }
 
@@ -135,6 +164,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],
+            ),
+          ),
+          IconButton(
+            onPressed: _toggleSave,
+            icon: Icon(
+              _isSaved ? Icons.bookmark : Icons.bookmark_border,
+              color: Colors.white,
             ),
           ),
         ],

@@ -651,32 +651,10 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildMoyoLogo() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildLogoLetter('M'),
-        Icon(Icons.favorite, color: Colors.pinkAccent.shade100, size: 40),
-        _buildLogoLetter('y'),
-        Icon(Icons.favorite, color: Colors.pinkAccent.shade100, size: 40),
-      ],
-    );
-  }
-
-  Widget _buildLogoLetter(String letter) {
-    return Text(
-      letter,
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: 64,
-        fontWeight: FontWeight.bold,
-        shadows: [
-          Shadow(
-            color: Colors.pinkAccent.withOpacity(0.5),
-            blurRadius: 10,
-            offset: const Offset(2, 2),
-          ),
-        ],
-      ),
+    return Image.asset(
+      'assets/images/moyo_logo.png',
+      height: 80,
+      fit: BoxFit.contain,
     );
   }
 }

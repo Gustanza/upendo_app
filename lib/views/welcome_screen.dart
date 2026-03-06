@@ -218,42 +218,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Widget _buildMoyoLogo() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'M',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 64,
-            fontWeight: FontWeight.bold,
-            shadows: [
-              Shadow(
-                color: Colors.pinkAccent.withOpacity(0.5),
-                blurRadius: 10,
-                offset: const Offset(2, 2),
-              ),
-            ],
-          ),
-        ),
-        Icon(Icons.favorite, color: Colors.pinkAccent.shade100, size: 40),
-        Text(
-          'y',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 64,
-            fontWeight: FontWeight.bold,
-            shadows: [
-              Shadow(
-                color: Colors.pinkAccent.withOpacity(0.5),
-                blurRadius: 10,
-                offset: const Offset(2, 2),
-              ),
-            ],
-          ),
-        ),
-        Icon(Icons.favorite, color: Colors.pinkAccent.shade100, size: 40),
-      ],
+    return Image.asset(
+      'assets/images/moyo_logo.png',
+      height: 80,
+      fit: BoxFit.contain,
     );
   }
 

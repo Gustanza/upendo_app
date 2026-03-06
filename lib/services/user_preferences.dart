@@ -41,4 +41,33 @@ class UserPreferences {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userKey);
   }
+
+  // --- Bookmark Logic ---
+  static const String _savedPostsKey = 'saved_posts_ids';
+
+  Future<void> toggleSavePost(String postId) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> savedIds = List<String>.from(
+      prefs.getStringList(_savedPostsKey) ?? [],
+    );
+
+    if (savedIds.contains(postId)) {
+      savedIds.remove(postId);
+    } else {
+      savedIds.add(postId);
+    }
+
+    await prefs.setStringList(_savedPostsKey, savedIds);
+  }
+
+  Future<bool> isPostSaved(String postId) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> savedIds = prefs.getStringList(_savedPostsKey) ?? [];
+    return savedIds.contains(postId);
+  }
+
+  Future<List<String>> getSavedPostIds() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return List<String>.from(prefs.getStringList(_savedPostsKey) ?? []);
+  }
 }

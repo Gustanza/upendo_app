@@ -303,32 +303,10 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
   }
 
   Widget _buildMoyoLogo() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildLogoLetter('M', 40),
-        const Icon(Icons.favorite, color: Colors.pinkAccent, size: 25),
-        _buildLogoLetter('y', 40),
-        const Icon(Icons.favorite, color: Colors.pinkAccent, size: 25),
-      ],
-    );
-  }
-
-  Widget _buildLogoLetter(String letter, double size) {
-    return Text(
-      letter,
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: size,
-        fontWeight: FontWeight.bold,
-        shadows: [
-          Shadow(
-            color: Colors.pinkAccent.withOpacity(0.5),
-            blurRadius: 5,
-            offset: const Offset(1, 1),
-          ),
-        ],
-      ),
+    return Image.asset(
+      'assets/images/moyo_logo.png',
+      height: 60,
+      fit: BoxFit.contain,
     );
   }
 

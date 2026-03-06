@@ -5,6 +5,7 @@ import 'package:upendo_app/views/chat_fragment.dart';
 import 'package:upendo_app/views/post_detail_screen.dart';
 import 'package:upendo_app/views/account_fragment.dart';
 import 'package:upendo_app/views/post_search_delegate.dart';
+import 'package:upendo_app/views/saved_fragment.dart';
 import '../models/post_model.dart';
 import '../services/post_service.dart';
 import '../services/user_preferences.dart';
@@ -35,6 +36,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
   final ScrollController _hotScrollController = ScrollController();
   final UserPreferences _userPreferences = UserPreferences();
   String _userName = 'Mtumiaji'; // Default "User" in Swahili
+  final GlobalKey<SavedFragmentState> _savedFragmentKey =
+      GlobalKey<SavedFragmentState>();
 
   @override
   void initState() {
@@ -58,6 +61,17 @@ class _HomeDashboardState extends State<HomeDashboard> {
   void dispose() {
     _hotScrollController.dispose();
     super.dispose();
+  }
+
+  void _switchTab(int index) {
+    if (index == 1) {
+      _savedFragmentKey.currentState?.fetchSavedPosts();
+    }
+    if (mounted) {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
   }
 
   void _onHotScroll() {
@@ -131,7 +145,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
         index: _currentIndex,
         children: [
           const ExploreFragment(), // 0: Explore
-          _buildEmptyFragment('Saved Content'), // 1: Saved
+          SavedFragment(key: _savedFragmentKey), // 1: Saved
           _buildHomeFragment(), // 2: Home
           const ChatFragment(), // 3: Chat
           const AccountFragment(), // 4: Account
@@ -139,15 +153,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
       ),
       bottomNavigationBar: _buildBottomNav(),
       extendBody: true,
-    );
-  }
-
-  Widget _buildEmptyFragment(String title) {
-    return Center(
-      child: Text(
-        '$title Screen',
-        style: const TextStyle(fontSize: 18, color: Colors.grey),
-      ),
     );
   }
 
@@ -500,7 +505,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () => _switchTab(index),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -519,7 +524,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   Widget _buildCenterHomeItem() {
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = 2),
+      onTap: () => _switchTab(2),
       child: Container(
         height: 50,
         width: 50,
