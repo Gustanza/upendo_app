@@ -1,56 +1,13 @@
 import 'package:flutter/material.dart';
+import '../services/category_service.dart';
+import '../models/category_model.dart';
 
 class ExploreFragment extends StatelessWidget {
   const ExploreFragment({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final topics = [
-      {
-        'title': 'Vijana',
-        'icon': Icons.people_outline,
-        'color': Colors.blue.shade800,
-      },
-      {
-        'title': 'Wachumba',
-        'icon': Icons.favorite_outline,
-        'color': Colors.blue.shade100,
-      },
-      {'title': 'Wanandoa', 'icon': Icons.wc, 'color': Colors.blue.shade100},
-      {
-        'title': 'Malezi',
-        'icon': Icons.family_restroom,
-        'color': Colors.blue.shade100,
-      },
-      {
-        'title': 'Migogoro',
-        'icon': Icons.forum_outlined,
-        'color': Colors.blue.shade800,
-      },
-      {
-        'title': 'Malengo',
-        'icon': Icons.directions_bike,
-        'color': Colors.blue.shade100,
-      },
-      {
-        'title': 'Kuachana',
-        'icon': Icons.heart_broken_outlined,
-        'color': Colors.blue.shade100,
-      },
-      {
-        'title': 'Dini & Tamaduni',
-        'icon': Icons.groups_3_outlined,
-        'color': Colors.blue.shade100,
-      },
-      {
-        'title': 'Afya ya Akili',
-        'icon': Icons.psychology_outlined,
-        'color': Colors.blue.shade100,
-      },
-      {'title': 'Mjane/Mgane', 'icon': null, 'color': Colors.grey.shade200},
-      {'title': 'Single Parent', 'icon': null, 'color': Colors.grey.shade200},
-      {'title': 'Wazee', 'icon': null, 'color': Colors.grey.shade200},
-    ];
+    final categoryService = CategoryService();
 
     return Column(
       children: [
@@ -89,58 +46,76 @@ class ExploreFragment extends StatelessWidget {
 
         // Grid
         Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(20),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 15,
-              mainAxisSpacing: 25,
-              childAspectRatio: 0.8,
-            ),
-            itemCount: topics.length,
-            itemBuilder: (context, index) {
-              final topic = topics[index];
-              final bool isMainBlue = topic['color'] == Colors.blue.shade800;
+          child: StreamBuilder<List<Category>>(
+            stream: categoryService.getCategories(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-              return Column(
-                children: [
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      color: topic['color'] as Color,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+
+              final categories = snapshot.data ?? [];
+
+              if (categories.isEmpty) {
+                return const Center(child: Text('No categories found.'));
+              }
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(20),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 15,
+                  mainAxisSpacing: 25,
+                  childAspectRatio: 0.8,
+                ),
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  final category = categories[index];
+                  // Using blue[800] as a reference for white icon theme
+                  final bool isMainBlue = category.colorHex == 0xFF1565C0;
+
+                  return Column(
+                    children: [
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          color: category.color,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Center(
-                      child: topic['icon'] != null
-                          ? Icon(
-                              topic['icon'] as IconData,
-                              color: isMainBlue
-                                  ? Colors.white
-                                  : Colors.blue.shade800,
-                              size: 45,
-                            )
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    topic['title'] as String,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
+                        child: Center(
+                          child: Icon(
+                            category.icon,
+                            color: isMainBlue
+                                ? Colors.white
+                                : Colors.blue.shade800,
+                            size: 45,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        category.name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               );
             },
           ),

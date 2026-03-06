@@ -5,6 +5,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:upendo_app/views/home_dashboard.dart';
 import 'package:upendo_app/views/profile_payment_screen.dart';
+import 'package:upendo_app/services/user_preferences.dart';
+import 'package:upendo_app/models/user_model.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -32,6 +34,7 @@ class _AuthScreenState extends State<AuthScreen> {
   String _completePhoneNumber = '';
 
   bool _isLoading = false;
+  final UserPreferences _userPreferences = UserPreferences();
 
   @override
   void dispose() {
@@ -68,19 +71,22 @@ class _AuthScreenState extends State<AuthScreen> {
             .doc(user.uid)
             .get();
 
-        if (mounted) {
-          if (userDoc.exists && userDoc.data()?['isActive'] == true) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomeDashboard()),
-            );
-          } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ProfilePaymentScreen(),
-              ),
-            );
+        if (userDoc.exists) {
+          await _userPreferences.saveUserData(UserModel.fromFirestore(userDoc));
+          if (mounted) {
+            if (userDoc.data()?['isActive'] == true) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HomeDashboard()),
+              );
+            } else {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ProfilePaymentScreen(),
+                ),
+              );
+            }
           }
         }
       }
@@ -127,6 +133,17 @@ class _AuthScreenState extends State<AuthScreen> {
               'expire_date': FieldValue.serverTimestamp(),
               'createdAt': FieldValue.serverTimestamp(),
             });
+
+        // Save to SharedPreferences
+        await _userPreferences.saveUserData(
+          UserModel(
+            id: credential.user!.uid,
+            fullName: _regNameController.text.trim(),
+            region: _regRegionController.text.trim(),
+            country: _regCountryController.text.trim(),
+            phone: _completePhoneNumber,
+          ),
+        );
 
         if (mounted) {
           Navigator.pushReplacement(
@@ -614,10 +631,8 @@ class _AuthScreenState extends State<AuthScreen> {
       // Obtain the auth details from the request
       final GoogleSignInAuthentication? googleAuth = googleUser?.authentication;
 
-      // Create a new credential
-      final credential = GoogleAuthProvider.credential(
-        idToken: googleAuth?.idToken,
-      );
+      // Authenticate with Google and navigate on success
+      GoogleAuthProvider.credential(idToken: googleAuth?.idToken);
 
       // Once signed in, return the UserCredential
       if (mounted) {
