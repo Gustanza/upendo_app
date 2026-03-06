@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:upendo_app/views/home_dashboard.dart';
+import 'package:upendo_app/views/profile_payment_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -21,6 +23,13 @@ class _AuthScreenState extends State<AuthScreen> {
   final TextEditingController _regNameController = TextEditingController();
   final TextEditingController _regEmailController = TextEditingController();
   final TextEditingController _regPasswordController = TextEditingController();
+  final TextEditingController _regBirthYearController = TextEditingController();
+  final TextEditingController _regCountryController = TextEditingController();
+  final TextEditingController _regRegionController = TextEditingController();
+  final TextEditingController _regPhoneController = TextEditingController();
+
+  DateTime? _selectedBirthDate;
+  String _completePhoneNumber = '';
 
   bool _isLoading = false;
 
@@ -31,6 +40,10 @@ class _AuthScreenState extends State<AuthScreen> {
     _regNameController.dispose();
     _regEmailController.dispose();
     _regPasswordController.dispose();
+    _regBirthYearController.dispose();
+    _regCountryController.dispose();
+    _regRegionController.dispose();
+    _regPhoneController.dispose();
     super.dispose();
   }
 
@@ -47,11 +60,29 @@ class _AuthScreenState extends State<AuthScreen> {
         email: _loginEmailController.text.trim(),
         password: _loginPasswordController.text.trim(),
       );
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeDashboard()),
-        );
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (mounted) {
+          if (userDoc.exists && userDoc.data()?['isActive'] == true) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeDashboard()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ProfilePaymentScreen(),
+              ),
+            );
+          }
+        }
       }
     } on FirebaseAuthException catch (e) {
       _showError(e.message ?? 'Hitilafu imetokea wakati wa kuingia');
@@ -63,7 +94,11 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _register() async {
     if (_regNameController.text.isEmpty ||
         _regEmailController.text.isEmpty ||
-        _regPasswordController.text.isEmpty) {
+        _regPasswordController.text.isEmpty ||
+        _selectedBirthDate == null ||
+        _regCountryController.text.isEmpty ||
+        _regRegionController.text.isEmpty ||
+        _completePhoneNumber.isEmpty) {
       _showError('Tafadhali jaza nafasi zote');
       return;
     }
@@ -84,13 +119,21 @@ class _AuthScreenState extends State<AuthScreen> {
             .set({
               'fullName': _regNameController.text.trim(),
               'email': _regEmailController.text.trim(),
+              'birthDate': _selectedBirthDate!.toIso8601String(),
+              'country': _regCountryController.text.trim(),
+              'region': _regRegionController.text.trim(),
+              'phone': _completePhoneNumber,
+              'isActive': false,
+              'expire_date': FieldValue.serverTimestamp(),
               'createdAt': FieldValue.serverTimestamp(),
             });
 
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const HomeDashboard()),
+            MaterialPageRoute(
+              builder: (context) => const ProfilePaymentScreen(),
+            ),
           );
         }
       }
@@ -176,7 +219,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                 ],
                               ),
                               SizedBox(
-                                height: 450, // Increased height for form area
+                                height: 650, // Increased height for more fields
                                 child: TabBarView(
                                   children: [
                                     SingleChildScrollView(
@@ -303,7 +346,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Widget _buildRegisterForm() {
     return Padding(
-      padding: const EdgeInsets.all(25.0),
+      padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 20.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -311,12 +354,14 @@ class _AuthScreenState extends State<AuthScreen> {
             label: 'Jina Kamili',
             icon: Icons.person_outline,
             controller: _regNameController,
+            capitalization: TextCapitalization.words,
           ),
           const SizedBox(height: 15),
           _buildTextField(
             label: 'Barua Pepe',
             icon: Icons.email_outlined,
             controller: _regEmailController,
+            capitalization: TextCapitalization.none,
           ),
           const SizedBox(height: 15),
           _buildTextField(
@@ -324,7 +369,59 @@ class _AuthScreenState extends State<AuthScreen> {
             icon: Icons.lock_outline,
             isPassword: true,
             controller: _regPasswordController,
+            capitalization: TextCapitalization.none,
           ),
+          const SizedBox(height: 15),
+          _buildTextField(
+            label: 'Tarehe ya Kuzaliwa',
+            icon: Icons.calendar_today_outlined,
+            hint: 'Bonyeza hapa kuchagua',
+            controller: _regBirthYearController,
+            readOnly: true,
+            onTap: () async {
+              final DateTime? picked = await showDatePicker(
+                context: context,
+                initialDate: DateTime.now().subtract(
+                  const Duration(days: 365 * 18),
+                ),
+                firstDate: DateTime(1900),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) {
+                setState(() {
+                  _selectedBirthDate = picked;
+                  _regBirthYearController.text =
+                      "${picked.day}/${picked.month}/${picked.year}";
+                });
+              }
+            },
+          ),
+          const SizedBox(height: 15),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  label: 'Nchi',
+                  icon: Icons.public_outlined,
+                  hint: 'mf. Tanzania',
+                  controller: _regCountryController,
+                  capitalization: TextCapitalization.words,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildTextField(
+                  label: 'Mkoa',
+                  icon: Icons.location_city_outlined,
+                  hint: 'mf. Dar es Salaam',
+                  controller: _regRegionController,
+                  capitalization: TextCapitalization.words,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          _buildPhoneField(),
           const SizedBox(height: 25),
           _buildPrimaryButton(
             text: 'JISAJILI',
@@ -336,11 +433,60 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  Widget _buildPhoneField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Namba ya Simu',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: IntlPhoneField(
+            controller: _regPhoneController,
+            decoration: InputDecoration(
+              hintText: '0754 xxx xxx',
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 15,
+                vertical: 15,
+              ),
+              counterStyle: const TextStyle(color: Colors.white70),
+            ),
+            initialCountryCode: 'TZ',
+            style: const TextStyle(color: Colors.white),
+            dropdownTextStyle: const TextStyle(color: Colors.white),
+            dropdownIcon: const Icon(
+              Icons.arrow_drop_down,
+              color: Colors.white,
+            ),
+            onChanged: (phone) {
+              _completePhoneNumber = phone.completeNumber;
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTextField({
     required String label,
     required IconData icon,
     String? hint,
     bool isPassword = false,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    TextCapitalization capitalization = TextCapitalization.sentences,
     required TextEditingController controller,
   }) {
     return Column(
@@ -363,6 +509,9 @@ class _AuthScreenState extends State<AuthScreen> {
           child: TextField(
             controller: controller,
             obscureText: isPassword,
+            readOnly: readOnly,
+            onTap: onTap,
+            textCapitalization: capitalization,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: hint,

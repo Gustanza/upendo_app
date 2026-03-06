@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:upendo_app/views/home_dashboard.dart';
 import 'package:upendo_app/views/welcome_screen.dart';
+import 'package:upendo_app/views/profile_payment_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -10,18 +12,35 @@ import 'firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  FirebaseAuth.instance.authStateChanges().listen((User? user) {
+
+  FirebaseAuth.instance.authStateChanges().listen((User? user) async {
     if (user == null) {
-      runApp(const NguvuYaUpendoApp(isSignedIn: false));
+      runApp(const NguvuYaUpendoApp(isSignedIn: false, isActive: false));
     } else {
-      runApp(const NguvuYaUpendoApp(isSignedIn: true));
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final bool isActive =
+            userDoc.exists && userDoc.data()?['isActive'] == true;
+        runApp(NguvuYaUpendoApp(isSignedIn: true, isActive: isActive));
+      } catch (e) {
+        // In case of error, default to inactive/welcome
+        runApp(const NguvuYaUpendoApp(isSignedIn: false, isActive: false));
+      }
     }
   });
 }
 
 class NguvuYaUpendoApp extends StatelessWidget {
   final bool isSignedIn;
-  const NguvuYaUpendoApp({super.key, required this.isSignedIn});
+  final bool isActive;
+  const NguvuYaUpendoApp({
+    super.key,
+    required this.isSignedIn,
+    required this.isActive,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +70,9 @@ class NguvuYaUpendoApp extends StatelessWidget {
           color: Colors.white,
         ),
       ),
-      home: isSignedIn ? const HomeDashboard() : const WelcomeScreen(),
+      home: isSignedIn
+          ? (isActive ? const HomeDashboard() : const ProfilePaymentScreen())
+          : const WelcomeScreen(),
     );
   }
 }

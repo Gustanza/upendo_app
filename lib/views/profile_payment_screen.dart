@@ -1,8 +1,100 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:upendo_app/views/home_dashboard.dart';
 
-class ProfilePaymentScreen extends StatelessWidget {
+class ProfilePaymentScreen extends StatefulWidget {
   const ProfilePaymentScreen({super.key});
+
+  @override
+  State<ProfilePaymentScreen> createState() => _ProfilePaymentScreenState();
+}
+
+class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
+  final TextEditingController _mpesaNumberController = TextEditingController();
+  final TextEditingController _paymentCodeController = TextEditingController();
+
+  bool _isLoading = false;
+  String? _lastSubmittedData;
+  String? _errorMessage;
+  String? _successMessage;
+
+  @override
+  void dispose() {
+    _mpesaNumberController.dispose();
+    _paymentCodeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleEndelea() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // 1. Fresh check for isActive
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (userDoc.exists && userDoc.data()?['isActive'] == true) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeDashboard()),
+          );
+        }
+        return;
+      }
+
+      // 2. If not active, check if we need to submit a new payment request
+      final String currentData =
+          "${_mpesaNumberController.text.trim()}-${_paymentCodeController.text.trim()}";
+
+      if (_mpesaNumberController.text.isEmpty ||
+          _paymentCodeController.text.isEmpty) {
+        setState(() {
+          _errorMessage = 'Tafadhali jaza namba ya simu na code ya malipo';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      if (currentData != _lastSubmittedData) {
+        // Submit new request
+        await FirebaseFirestore.instance.collection('payment_requests').add({
+          'userId': user.uid,
+          'userEmail': user.email,
+          'mpesaNumber': _mpesaNumberController.text.trim(),
+          'paymentCode': _paymentCodeController.text.trim(),
+          'amount': 3000,
+          'status': 'pending',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+
+        _lastSubmittedData = currentData;
+        setState(() {
+          _successMessage = 'Ombi lako limetumwa. Subiri uhakiki wa Admin.';
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'Ombi lako bado linashughulikiwa. Subiri kidogo.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Hitilafu imetokea. Jaribu tena baadae.';
+      });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,43 +148,37 @@ class ProfilePaymentScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 _buildMoyoLogo(),
                 const SizedBox(height: 10),
-                const Text(
-                  'Andika Taarifa zako',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 20),
 
-                // Form Section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Column(
-                    children: [
-                      _buildInlineLabelField('Jina:', ''),
-                      const SizedBox(height: 10),
-                      _buildInlineLabelField('Mwaka wa Kuzaliwa:', ''),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(child: _buildInlineLabelField('Nchi:', '')),
-                          const SizedBox(width: 10),
-                          Expanded(child: _buildInlineLabelField('Mkoa:', '')),
-                        ],
+                if (_errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 5,
+                    ),
+                    child: Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(child: _buildInlineLabelField('Simu:', '')),
-                          const SizedBox(width: 10),
-                          Expanded(child: _buildInlineLabelField('email:', '')),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                if (_successMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 5,
+                    ),
+                    child: Text(
+                      _successMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.lightGreenAccent,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
 
                 const SizedBox(height: 15),
                 const Text(
@@ -111,7 +197,6 @@ class ProfilePaymentScreen extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Simulated Vodacom logo
                       const Icon(
                         Icons.radio_button_checked,
                         color: Colors.red,
@@ -120,7 +205,6 @@ class ProfilePaymentScreen extends StatelessWidget {
                       const SizedBox(width: 5),
                       const VerticalDivider(width: 1, color: Colors.grey),
                       const SizedBox(width: 5),
-                      // Simulated M-pesa logo
                       Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -155,16 +239,22 @@ class ProfilePaymentScreen extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      _buildPaymentRow('Kifurushi:', _buildDropdown()),
-                      const SizedBox(height: 10),
+                      _buildPaymentRow('Kifurushi:', _buildPackageDisplay()),
+                      const SizedBox(height: 15),
                       _buildPaymentRow(
                         'Andika Namba\nitakayolipia;',
-                        _buildPaymentTextField('mf. 0754 xxx xxx'),
+                        _buildPaymentTextField(
+                          'mf. 0754 xxx xxx',
+                          _mpesaNumberController,
+                        ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 15),
                       _buildPaymentRow(
                         'Code ya malipo:',
-                        _buildPaymentTextField(''),
+                        _buildPaymentTextField(
+                          'mf. RQX7...',
+                          _paymentCodeController,
+                        ),
                       ),
                     ],
                   ),
@@ -179,14 +269,7 @@ class ProfilePaymentScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const HomeDashboard(),
-                          ),
-                        );
-                      },
+                      onPressed: _isLoading ? null : _handleEndelea,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00AEEF),
                         foregroundColor: Colors.white,
@@ -194,10 +277,19 @@ class ProfilePaymentScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      child: const Text(
-                        'ENDELEA',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'ENDELEA',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                     ),
                   ),
                 ),
@@ -240,36 +332,6 @@ class ProfilePaymentScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInlineLabelField(String label, String hint) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(width: 5),
-          Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: hint,
-                isDense: true,
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-              ),
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPaymentRow(String label, Widget field) {
     return Row(
       children: [
@@ -290,42 +352,37 @@ class ProfilePaymentScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDropdown() {
+  Widget _buildPackageDisplay() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Row(
-        children: const [
-          Expanded(
-            child: Text(
-              'Kwa siku - Tsh: 1,000/=',
-              style: TextStyle(fontSize: 11),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          Icon(Icons.more_vert, size: 16),
-        ],
+      child: const Text(
+        'Mwezi 1 - Tsh: 3,000/=',
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
 
-  Widget _buildPaymentTextField(String hint) {
+  Widget _buildPaymentTextField(String hint, TextEditingController controller) {
     return Container(
-      height: 35,
+      height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(4),
       ),
       child: TextField(
+        controller: controller,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(color: Colors.grey, fontSize: 11),
           isDense: true,
           border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
         ),
         style: const TextStyle(fontSize: 12),
       ),
