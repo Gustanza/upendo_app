@@ -4,6 +4,7 @@ import 'package:upendo_app/views/explore_fragment.dart';
 import 'package:upendo_app/views/chat_fragment.dart';
 import 'package:upendo_app/views/post_detail_screen.dart';
 import 'package:upendo_app/views/account_fragment.dart';
+import 'package:upendo_app/views/post_search_delegate.dart';
 import '../models/post_model.dart';
 import '../services/post_service.dart';
 import '../services/user_preferences.dart';
@@ -232,22 +233,26 @@ class _HomeDashboardState extends State<HomeDashboard> {
           ),
           const SizedBox(height: 30),
           // Search Bar
-          Container(
-            height: 55,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            child: Row(
-              children: const [
-                Icon(Icons.search, color: Colors.grey),
-                SizedBox(width: 10),
-                Text(
-                  'Tafuta',
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-              ],
+          GestureDetector(
+            onTap: () =>
+                showSearch(context: context, delegate: PostSearchDelegate()),
+            child: Container(
+              height: 55,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              child: Row(
+                children: const [
+                  Icon(Icons.search, color: Colors.grey),
+                  SizedBox(width: 10),
+                  Text(
+                    'Tafuta',
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

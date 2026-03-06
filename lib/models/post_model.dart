@@ -10,6 +10,7 @@ class PostModel {
   final String type;
   final bool featured;
   final bool hot;
+  final String categoryId;
 
   PostModel({
     required this.id,
@@ -21,6 +22,7 @@ class PostModel {
     required this.type,
     required this.featured,
     required this.hot,
+    required this.categoryId,
   });
 
   factory PostModel.fromFirestore(DocumentSnapshot doc) {
@@ -35,6 +37,7 @@ class PostModel {
       type: data['type'] ?? 'video',
       featured: data['featured'] ?? false,
       hot: data['hot'] ?? false,
+      categoryId: data['category_id'] ?? '',
     );
   }
 
@@ -48,6 +51,7 @@ class PostModel {
       'type': type,
       'featured': featured,
       'hot': hot,
+      'category_id': categoryId,
     };
   }
 }

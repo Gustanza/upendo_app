@@ -68,4 +68,27 @@ class PostService {
     QuerySnapshot snapshot = await query.get();
     return snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
   }
+
+  Future<List<PostModel>> getPostsByCategory(String categoryId) async {
+    QuerySnapshot snapshot = await _db
+        .collection('posts')
+        .where('category_id', isEqualTo: categoryId)
+        .get();
+    return snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList();
+  }
+
+  Future<List<PostModel>> searchPosts(String query) async {
+    if (query.isEmpty) return [];
+
+    // Firestore prefix search
+    QuerySnapshot snapshot = await _db
+        .collection('posts')
+        .orderBy('title')
+        .startAt([query])
+        .endAt([query + '\uf8ff'])
+        .limit(20)
+        .get();
+
+    return snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList();
+  }
 }

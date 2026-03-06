@@ -9,7 +9,7 @@ class Category {
   Category({
     required this.id,
     required this.name,
-    this.iconCode = 0xe491, // people_outline
+    this.iconCode = 0xe2cc, // folder
     this.colorHex = 0xFF1565C0, // blue[800]
   });
 
@@ -17,7 +17,7 @@ class Category {
     return Category(
       id: id,
       name: data['name'] ?? 'Unknown',
-      iconCode: data['iconCode'] ?? 0xe491,
+      iconCode: data['iconCode'] ?? 0xe2cc,
       colorHex: data['colorHex'] ?? 0xFF1565C0,
     );
   }
