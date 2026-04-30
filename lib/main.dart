@@ -5,7 +5,7 @@ import 'package:upendo_app/views/home_dashboard.dart';
 import 'package:upendo_app/views/welcome_screen.dart';
 import 'package:upendo_app/views/profile_payment_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+import 'firebase_options.dart'; 
 
 // ...
 

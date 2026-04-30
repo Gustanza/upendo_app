@@ -55,8 +55,47 @@
 
           <!-- Category -->
           <div class="field">
-            <label class="label" for="f-cat">Category ID</label>
-            <input id="f-cat" v-model="form.category_id" class="input" type="text" placeholder="Firestore category document ID" />
+            <label class="label">Category</label>
+            <div v-if="categoriesLoading" class="cat-loading">Loading categories…</div>
+            <div v-else class="cat-dropdown" v-click-outside="() => catOpen = false">
+              <button type="button" class="cat-trigger" @click="catOpen = !catOpen">
+                <template v-if="selectedCategory">
+                  <span class="cat-trigger-icon" :style="{ background: catCssColor(selectedCategory.colorHex) }">
+                    <span class="mi">{{ catIconChar(selectedCategory.iconCode) }}</span>
+                  </span>
+                  <span class="cat-trigger-name">{{ selectedCategory.name }}</span>
+                </template>
+                <template v-else>
+                  <span class="cat-trigger-placeholder">Select a category…</span>
+                </template>
+                <svg class="cat-chevron" :class="{ open: catOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+
+              <div v-if="catOpen" class="cat-menu">
+                <button type="button" class="cat-option" :class="{ active: form.category_id === '' }" @click="selectCat(null)">
+                  <span class="cat-option-icon-none">—</span>
+                  <span class="cat-option-name">None</span>
+                </button>
+                <button
+                  v-for="cat in categories"
+                  :key="cat.id"
+                  type="button"
+                  class="cat-option"
+                  :class="{ active: form.category_id === cat.id }"
+                  @click="selectCat(cat)"
+                >
+                  <span class="cat-option-icon" :style="{ background: catCssColor(cat.colorHex) }">
+                    <span class="mi">{{ catIconChar(cat.iconCode) }}</span>
+                  </span>
+                  <span class="cat-option-name">{{ cat.name }}</span>
+                  <svg v-if="form.category_id === cat.id" class="cat-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Thumbnail upload -->
@@ -136,10 +175,22 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
-import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { collection, addDoc, doc, updateDoc, getDocs, serverTimestamp } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
+import { flutterColorToCss, iconChar } from '../utils/iconData.js'
 import FileUploader from './FileUploader.vue'
+
+const catCssColor = (hex) => flutterColorToCss(hex ?? 0xFF1565C0)
+const catIconChar  = (code) => iconChar(code ?? 0xe2cc)
+
+const vClickOutside = {
+  mounted(el, binding) {
+    el._outside = (e) => { if (!el.contains(e.target)) binding.value(e) }
+    document.addEventListener('mousedown', el._outside)
+  },
+  unmounted(el) { document.removeEventListener('mousedown', el._outside) },
+}
 
 const props = defineProps({
   post: { type: Object, default: null },
@@ -147,6 +198,30 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 const isEdit = computed(() => !!props.post)
+
+const categories        = ref([])
+const categoriesLoading = ref(true)
+const catOpen           = ref(false)
+
+const selectedCategory = computed(() =>
+  categories.value.find(c => c.id === form.category_id) ?? null
+)
+
+function selectCat(cat) {
+  form.category_id = cat ? cat.id : ''
+  catOpen.value = false
+}
+
+onMounted(async () => {
+  const snap = await getDocs(collection(db, 'categories'))
+  categories.value = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data(),
+    iconCode: d.data().iconCode ?? 0xe2cc,
+    colorHex: d.data().colorHex ?? 0xFF1565C0,
+  }))
+  categoriesLoading.value = false
+})
 
 const types = [
   { label: 'Video', value: 'video', icon: '🎬' },
@@ -344,4 +419,95 @@ async function save() {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .save-error { font-size: 13px; color: #c81e1e; background: #fde8e8; padding: 10px 14px; border-radius: 8px; }
+
+.cat-loading { font-size: 13px; color: #9ca3af; }
+
+.cat-dropdown { position: relative; }
+
+.cat-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1.5px solid #dde0ee;
+  border-radius: 8px;
+  background: #fafbff;
+  font-size: 14px;
+  color: #1a1d2e;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s;
+}
+.cat-trigger:hover, .cat-trigger:focus { border-color: #3b4cca; outline: none; }
+
+.cat-trigger-icon {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.cat-trigger-icon .mi { font-family: 'Material Icons'; font-style: normal; font-weight: normal; font-size: 14px; color: #fff; line-height: 1; }
+
+.cat-trigger-name { flex: 1; font-weight: 500; }
+.cat-trigger-placeholder { flex: 1; color: #9ca3af; }
+
+.cat-chevron {
+  width: 16px; height: 16px;
+  color: #9ca3af; flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.cat-chevron.open { transform: rotate(180deg); }
+
+.cat-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: #fff;
+  border: 1.5px solid #dde0ee;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  z-index: 200;
+  overflow: hidden;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.cat-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+.cat-option:hover { background: #f5f6ff; }
+.cat-option.active { background: #eef0fd; color: #3b4cca; }
+
+.cat-option-icon {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.cat-option-icon .mi { font-family: 'Material Icons'; font-style: normal; font-weight: normal; font-size: 14px; color: #fff; line-height: 1; }
+
+.cat-option-icon-none {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: #9ca3af; flex-shrink: 0;
+}
+
+.cat-option-name { flex: 1; }
+
+.cat-check { width: 14px; height: 14px; color: #3b4cca; flex-shrink: 0; }
 </style>

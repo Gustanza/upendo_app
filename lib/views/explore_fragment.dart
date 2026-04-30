@@ -94,8 +94,6 @@ class ExploreFragment extends StatelessWidget {
                 itemCount: categories.length,
                 itemBuilder: (context, index) {
                   final category = categories[index];
-                  // Using blue[800] as a reference for white icon theme
-                  final bool isMainBlue = category.colorHex == 0xFF1565C0;
 
                   return GestureDetector(
                     onTap: () => Navigator.push(
@@ -124,9 +122,7 @@ class ExploreFragment extends StatelessWidget {
                           child: Center(
                             child: Icon(
                               category.icon,
-                              color: isMainBlue
-                                  ? Colors.white
-                                  : Colors.blue.shade800,
+                              color: Colors.white,
                               size: 45,
                             ),
                           ),
