@@ -1,18 +1,33 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:upendo_app/views/home_dashboard.dart';
 import 'package:upendo_app/views/welcome_screen.dart';
 import 'package:upendo_app/views/profile_payment_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; 
+import 'firebase_options.dart';
 
 // ...
+const lokol = "";
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
+  if (kDebugMode) {
+    try {
+      // FirebaseStorage storage = FirebaseStorage.instance;
+      FirebaseFirestore firestore = FirebaseFirestore.instance;
+      firestore.settings = const Settings(
+        host: "$lokol:8080",
+        sslEnabled: false,
+        persistenceEnabled: false,
+      );
+      // await storage.useStorageEmulator("$lokol", 9199);
+    } catch (e) {
+      debugPrint("Abject: $e");
+    }
+  }
   FirebaseAuth.instance.authStateChanges().listen((User? user) async {
     if (user == null) {
       runApp(const NguvuYaUpendoApp(isSignedIn: false, isActive: false));
