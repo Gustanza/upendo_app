@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm run *)",
       "Bash(xargs grep *)",
-      "Bash(firebase --version)"
+      "Bash(firebase --version)",
+      "Bash(dart analyze *)"
     ]
   }
 }

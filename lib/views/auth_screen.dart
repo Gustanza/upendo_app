@@ -173,21 +173,57 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Future<void> signInWithGoogle() async {
+    setState(() => _isLoading = true);
     try {
-      final googleUser  = await GoogleSignIn.instance.authenticate();
-      final googleAuth  = googleUser.authentication;
-      GoogleAuthProvider.credential(idToken: googleAuth.idToken);
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeDashboard()),
-        );
+      final googleUser = await GoogleSignIn.instance.authenticate();
+      final googleAuth = googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+      );
+
+      final userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+      final user = userCred.user;
+      if (user == null) return;
+
+      final db  = FirebaseFirestore.instance;
+      final doc = await db.collection('users').doc(user.uid).get();
+
+      if (!doc.exists) {
+        // First Google sign-in — create user doc locked behind subscription
+        await db.collection('users').doc(user.uid).set({
+          'fullName':  user.displayName ?? '',
+          'email':     user.email ?? '',
+          'phone':     user.phoneNumber ?? '',
+          'country':   '',
+          'region':    '',
+          'isActive':  false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const ProfilePaymentScreen()),
+          );
+        }
+      } else {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => doc.data()?['isActive'] == true
+                  ? const HomeDashboard()
+                  : const ProfilePaymentScreen(),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.toString())));
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

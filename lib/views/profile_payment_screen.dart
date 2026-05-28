@@ -1,7 +1,14 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:upendo_app/views/home_dashboard.dart';
+
+enum _PaymentState { loading, selectPackage, initiating, waiting }
 
 class ProfilePaymentScreen extends StatefulWidget {
   const ProfilePaymentScreen({super.key});
@@ -11,90 +18,146 @@ class ProfilePaymentScreen extends StatefulWidget {
 }
 
 class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
-  final TextEditingController _mpesaNumberController = TextEditingController();
-  final TextEditingController _paymentCodeController = TextEditingController();
+  static const _subscribeUrl = 'https://subscribe-dcnp2gn42a-uc.a.run.app';
+  static const _callbackUrl  = 'https://moyoapptanzania-cf0e7.web.app';
 
-  bool _isLoading = false;
-  String? _lastSubmittedData;
+  _PaymentState _state = _PaymentState.loading;
+  List<Map<String, dynamic>> _packages = [];
+  String? _selectedPackageId;
   String? _errorMessage;
-  String? _successMessage;
+  StreamSubscription<DocumentSnapshot>? _userSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPackages();
+  }
 
   @override
   void dispose() {
-    _mpesaNumberController.dispose();
-    _paymentCodeController.dispose();
+    _userSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _handleEndelea() async {
+  // ── Data ────────────────────────────────────────────────────
+
+  Future<void> _loadPackages() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('packages')
+          .where('isActive', isEqualTo: true)
+          .get();
+      final pkgs = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      if (!mounted) return;
+      setState(() {
+        _packages = pkgs;
+        _selectedPackageId = pkgs.isNotEmpty ? pkgs.first['id'] as String : null;
+        _state = _PaymentState.selectPackage;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Imeshindwa kupakua vifurushi. Jaribu tena.';
+        _state = _PaymentState.selectPackage;
+      });
+    }
+  }
+
+  Future<void> _initiatePayment() async {
+    if (_selectedPackageId == null) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
     setState(() {
-      _isLoading = true;
+      _state = _PaymentState.initiating;
       _errorMessage = null;
-      _successMessage = null;
     });
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      // 1. Fresh check for isActive
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      if (userDoc.exists && userDoc.data()?['isActive'] == true) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeDashboard()),
-          );
-        }
-        return;
-      }
-
-      // 2. If not active, check if we need to submit a new payment request
-      final String currentData =
-          "${_mpesaNumberController.text.trim()}-${_paymentCodeController.text.trim()}";
-
-      if (_mpesaNumberController.text.isEmpty ||
-          _paymentCodeController.text.isEmpty) {
-        setState(() {
-          _errorMessage = 'Tafadhali jaza namba ya simu na code ya malipo';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      if (currentData != _lastSubmittedData) {
-        // Submit new request
-        await FirebaseFirestore.instance.collection('payment_requests').add({
+      final resp = await http.post(
+        Uri.parse(_subscribeUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
           'userId': user.uid,
-          'userEmail': user.email,
-          'mpesaNumber': _mpesaNumberController.text.trim(),
-          'paymentCode': _paymentCodeController.text.trim(),
-          'amount': 3000,
-          'status': 'pending',
-          'timestamp': FieldValue.serverTimestamp(),
-        });
+          'packageId': _selectedPackageId,
+          'callback_url': _callbackUrl,
+        }),
+      );
 
-        _lastSubmittedData = currentData;
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final err = data['error'];
+      if (err != null) {
+        if (!mounted) return;
         setState(() {
-          _successMessage = 'Ombi lako limetumwa. Subiri uhakiki wa Admin.';
+          _state = _PaymentState.selectPackage;
+          _errorMessage = (err as Map)['message']?.toString() ?? 'Hitilafu imetokea.';
         });
-      } else {
-        setState(() {
-          _errorMessage = 'Ombi lako bado linashughulikiwa. Subiri kidogo.';
-        });
+        return;
       }
-    } catch (e) {
+
+      final redirectUrl = data['redirect_url'] as String;
+      await launchUrl(Uri.parse(redirectUrl), mode: LaunchMode.externalApplication);
+
+      if (!mounted) return;
+      setState(() => _state = _PaymentState.waiting);
+      _listenForActivation(user.uid);
+    } catch (_) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = 'Hitilafu imetokea. Jaribu tena baadae.';
+        _state = _PaymentState.selectPackage;
+        _errorMessage = 'Hitilafu imetokea. Angalia mtandao na ujaribu tena.';
       });
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  void _listenForActivation(String uid) {
+    _userSub?.cancel();
+    _userSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .listen((snap) {
+          if (!mounted) return;
+          if (snap.data()?['isActive'] == true) {
+            _userSub?.cancel();
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const HomeDashboard()),
+            );
+          }
+        });
+  }
+
+  Future<void> _checkActivation() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    setState(() => _errorMessage = null);
+
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!mounted) return;
+    if (snap.data()?['isActive'] == true) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeDashboard()),
+      );
+    } else {
+      setState(() => _errorMessage = 'Malipo bado hayajathibitishwa. Subiri kidogo.');
+    }
+  }
+
+  void _goBackToSelection() {
+    _userSub?.cancel();
+    setState(() {
+      _state = _PaymentState.selectPackage;
+      _errorMessage = null;
+    });
+  }
+
+  // ── Build ────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -106,10 +169,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF00AEEF), // Light Blue
-              Color(0xFF00008B), // Dark Blue
-            ],
+            colors: [Color(0xFF00AEEF), Color(0xFF00008B)],
             stops: [0.0, 1.0],
           ),
         ),
@@ -118,181 +178,36 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                // Header Image with Fade
+                // Header image
                 SizedBox(
-                  height: 250,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Positioned.fill(
-                        child: ShaderMask(
-                          shaderCallback: (rect) {
-                            return const LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Colors.black, Colors.transparent],
-                              stops: [0.7, 1.0],
-                            ).createShader(rect);
-                          },
-                          blendMode: BlendMode.dstIn,
-                          child: Image.asset(
-                            'assets/images/g272.png',
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                    ],
+                  height: 220,
+                  width: double.infinity,
+                  child: ShaderMask(
+                    shaderCallback: (rect) => const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.black, Colors.transparent],
+                      stops: [0.7, 1.0],
+                    ).createShader(rect),
+                    blendMode: BlendMode.dstIn,
+                    child: Image.asset('assets/images/g272.png', fit: BoxFit.cover),
                   ),
-                ),
-                // Stylized Moyo Logo (Smaller for this screen)
-                const SizedBox(height: 10),
-                _buildMoyoLogo(),
-                const SizedBox(height: 10),
-
-                if (_errorMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 5,
-                    ),
-                    child: Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                if (_successMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 5,
-                    ),
-                    child: Text(
-                      _successMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.lightGreenAccent,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-
-                const SizedBox(height: 15),
-                const Text(
-                  'Lipa kwa M-pesa',
-                  style: TextStyle(color: Colors.white, fontSize: 14),
                 ),
                 const SizedBox(height: 10),
+                Image.asset('assets/images/moyo_logo.png', height: 55, fit: BoxFit.contain),
+                const SizedBox(height: 24),
 
-                // M-pesa Logo Placeholder
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.radio_button_checked,
-                        color: Colors.red,
-                        size: 30,
-                      ),
-                      const SizedBox(width: 5),
-                      const VerticalDivider(width: 1, color: Colors.grey),
-                      const SizedBox(width: 5),
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.phone_android,
-                            color: Colors.green.shade700,
-                            size: 20,
-                          ),
-                          const Text(
-                            'm-pesa',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                // Body — swaps by state
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: switch (_state) {
+                    _PaymentState.loading    => _buildLoading(),
+                    _PaymentState.initiating => _buildInitiating(),
+                    _PaymentState.waiting    => _buildWaiting(),
+                    _PaymentState.selectPackage => _buildSelectPackage(),
+                  },
                 ),
 
-                const SizedBox(height: 15),
-
-                // Payment Box (Red Container)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildPaymentRow('Kifurushi:', _buildPackageDisplay()),
-                      const SizedBox(height: 15),
-                      _buildPaymentRow(
-                        'Andika Namba\nitakayolipia;',
-                        _buildPaymentTextField(
-                          'mf. 0754 xxx xxx',
-                          _mpesaNumberController,
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      _buildPaymentRow(
-                        'Code ya malipo:',
-                        _buildPaymentTextField(
-                          'mf. RQX7...',
-                          _paymentCodeController,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // ENDELEA Button
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleEndelea,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00AEEF),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              'ENDELEA',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 40),
               ],
             ),
@@ -302,67 +217,288 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
     );
   }
 
-  Widget _buildMoyoLogo() {
-    return Image.asset(
-      'assets/images/moyo_logo.png',
-      height: 60,
-      fit: BoxFit.contain,
+  // ── State: loading packages ──────────────────────────────────
+
+  Widget _buildLoading() {
+    return const Padding(
+      key: ValueKey('loading'),
+      padding: EdgeInsets.symmetric(vertical: 50),
+      child: CircularProgressIndicator(color: Colors.white),
     );
   }
 
-  Widget _buildPaymentRow(String label, Widget field) {
-    return Row(
-      children: [
-        Expanded(
-          flex: 2,
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+  // ── State: calling subscribe function ────────────────────────
+
+  Widget _buildInitiating() {
+    return const Padding(
+      key: ValueKey('initiating'),
+      padding: EdgeInsets.symmetric(vertical: 50),
+      child: Column(
+        children: [
+          CircularProgressIndicator(color: Colors.white),
+          SizedBox(height: 16),
+          Text(
+            'Inaandaa malipo…',
+            style: TextStyle(color: Colors.white, fontSize: 15),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── State: browser open, waiting for PesaPal IPN ─────────────
+
+  Widget _buildWaiting() {
+    return Padding(
+      key: const ValueKey('waiting'),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(38),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withAlpha(77)),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.open_in_browser_rounded, color: Colors.white, size: 44),
+                const SizedBox(height: 14),
+                const Text(
+                  'Ukurasa wa malipo umefunguliwa',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Kamilisha malipo kwenye kivinjari. Programu itafunguka moja kwa moja baada ya malipo kukubaliwa.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(217),
+                    fontSize: 13,
+                    height: 1.55,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                ),
+              ],
             ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(flex: 3, child: field),
-      ],
+          const SizedBox(height: 16),
+
+          if (_errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.orangeAccent, fontSize: 13),
+              ),
+            ),
+
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _checkActivation,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF00008B),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text(
+                'Nimemaliza malipo',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          TextButton(
+            onPressed: _goBackToSelection,
+            child: const Text(
+              'Rudi nyuma',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildPackageDisplay() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: const Text(
-        'Mwezi 1 - Tsh: 3,000/=',
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-        overflow: TextOverflow.ellipsis,
+  // ── State: package selection ─────────────────────────────────
+
+  Widget _buildSelectPackage() {
+    return Padding(
+      key: const ValueKey('selectPackage'),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          if (_errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+
+          if (_packages.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(38),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Hakuna vifurushi vya usajili kwa sasa.\nTafadhali wasiliana na msimamizi.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+              ),
+            )
+          else ...[
+            const Text(
+              'Chagua kifurushi cha usajili',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            ..._packages.map(_buildPackageCard),
+
+            const SizedBox(height: 22),
+
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _selectedPackageId != null ? _initiatePayment : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00AEEF),
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.white24,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text(
+                  'ENDELEA',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildPaymentTextField(String hint, TextEditingController controller) {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.grey, fontSize: 11),
-          isDense: true,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+  Widget _buildPackageCard(Map<String, dynamic> pkg) {
+    final isSelected = _selectedPackageId == pkg['id'];
+    final price    = (pkg['price'] as num?)?.toStringAsFixed(0) ?? '0';
+    final currency = (pkg['currency'] as String?) ?? 'TZS';
+    final days     = (pkg['durationDays'] as num?)?.toInt() ?? 30;
+    final name     = (pkg['name'] as String?) ?? '';
+    final desc     = (pkg['description'] as String?) ?? '';
+
+    return GestureDetector(
+      onTap: () => setState(() => _selectedPackageId = pkg['id'] as String),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.white.withAlpha(38),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Colors.white : Colors.white.withAlpha(77),
+            width: isSelected ? 2 : 1,
+          ),
         ),
-        style: const TextStyle(fontSize: 12),
+        child: Row(
+          children: [
+            // Radio indicator
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? const Color(0xFF3b4cca) : Colors.white60,
+                  width: 2,
+                ),
+                color: isSelected ? const Color(0xFF3b4cca) : Colors.transparent,
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, size: 13, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 12),
+
+            // Name + description
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? const Color(0xFF1a1d2e) : Colors.white,
+                    ),
+                  ),
+                  if (desc.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      desc,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isSelected ? Colors.grey[600] : Colors.white70,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // Price + duration
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '$currency $price',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? const Color(0xFF1a1d2e) : Colors.white,
+                  ),
+                ),
+                Text(
+                  '$days siku',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isSelected ? Colors.grey[600] : Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

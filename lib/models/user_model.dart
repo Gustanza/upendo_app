@@ -7,6 +7,9 @@ class UserModel {
   final String country;
   final String phone;
   final DateTime? createdAt;
+  final bool isActive;
+  final DateTime? subscriptionExpiry;
+  final String? activePackageId;
 
   UserModel({
     required this.id,
@@ -15,10 +18,13 @@ class UserModel {
     required this.country,
     required this.phone,
     this.createdAt,
+    this.isActive = false,
+    this.subscriptionExpiry,
+    this.activePackageId,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    final data = doc.data() as Map<String, dynamic>;
     return UserModel(
       id: doc.id,
       fullName: data['fullName'] ?? 'Unknown',
@@ -28,6 +34,11 @@ class UserModel {
       createdAt: data['createdAt'] != null
           ? (data['createdAt'] as Timestamp).toDate()
           : null,
+      isActive: data['isActive'] == true,
+      subscriptionExpiry: data['subscriptionExpiry'] != null
+          ? (data['subscriptionExpiry'] as Timestamp).toDate()
+          : null,
+      activePackageId: data['activePackageId'] as String?,
     );
   }
 

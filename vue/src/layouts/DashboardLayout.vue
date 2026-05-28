@@ -26,6 +26,11 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Users
         </RouterLink>
+
+        <RouterLink to="/packages" class="nav-item" active-class="active">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/><path d="M8 7V5a2 2 0 0 1 4 0v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+          Packages
+        </RouterLink>
       </nav>
     </aside>
 
@@ -62,6 +67,7 @@ const pageTitle = computed(() => {
   if (route.path === '/posts') return 'Posts'
   if (route.path === '/categories') return 'Categories'
   if (route.path === '/users') return 'Users'
+  if (route.path === '/packages') return 'Packages'
   return 'Overview'
 })
 

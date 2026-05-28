@@ -1,12 +1,12 @@
 const axios = require('axios');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { onRequest } = require('firebase-functions/v2/https');
-const { eventsCol, attendeesCol, attendeePaymentsCol } = require("../utils/constants");
-const { FieldValue } = require("firebase-admin/firestore");
-const {
-    onDocumentWritten,
-} = require('firebase-functions/v2/firestore');
 
+const CONSUMER_KEY = "cFt6sZVPpt6hzIMiCvCnDA+Xi27At/+x";
+const CONSUMER_SECRET = "GcLyvCpNUBd4DHsgFQjWrKbAPaQ=";
+
+// Update this after first deploy — grab the resolvePayment URL from Firebase console
+const RESOLVE_PAYMENT_URL = "https://resolvepayment-dcnp2gn42a-uc.a.run.app";
 
 const axiosClient = axios.create({
     baseURL: 'https://pay.pesapal.com/v3/api',
@@ -16,139 +16,129 @@ const axiosClient = axios.create({
     }
 });
 
-const paymentsCol = "payments";
+const packagesCol = "packages";
+const subscriptionsCol = "subscriptions";
+const usersCol = "users";
 
-const lipaMchango = onRequest(
+const subscribe = onRequest(
     { cors: true },
     async (req, res) => {
         try {
             const db = getFirestore();
-            var body = req.body;
-            const amount = body.amount;
-            const userId = body.userId;
-            const callback_url = body.callback_url;
-            const authResp = await axiosClient.post("/Auth/RequestToken", {
-                "consumer_key": "cFt6sZVPpt6hzIMiCvCnDA+Xi27At/+x",
-                "consumer_secret": "GcLyvCpNUBd4DHsgFQjWrKbAPaQ="
-            });
+            const { userId, packageId, callback_url } = req.body;
 
-            const authData = authResp.data;
-            if (authData.status != 200) return res.json({
-                error: {
-                    message: "Auth failed"
-                }
+            if (!userId || !packageId || !callback_url) {
+                return res.status(400).json({
+                    error: { message: "userId, packageId, and callback_url are required" }
+                });
+            }
+
+            // Fetch subscription package
+            const packageDoc = await db.collection(packagesCol).doc(packageId).get();
+            if (!packageDoc.exists) {
+                return res.status(404).json({ error: { message: "Package not found" } });
+            }
+            const pkg = packageDoc.data();
+
+            if (!pkg.isActive) {
+                return res.status(400).json({ error: { message: "Package is not available" } });
+            }
+
+            // Fetch user for billing info
+            const userDoc = await db.collection(usersCol).doc(userId).get();
+            if (!userDoc.exists) {
+                return res.status(404).json({ error: { message: "User not found" } });
+            }
+            const user = userDoc.data();
+
+            // Authenticate with PesaPal
+            const authResp = await axiosClient.post("/Auth/RequestToken", {
+                consumer_key: CONSUMER_KEY,
+                consumer_secret: CONSUMER_SECRET,
             });
+            const authData = authResp.data;
+            if (authData.status != 200) {
+                return res.json({ error: { message: "PesaPal auth failed" } });
+            }
             const authKey = authData.token;
+
+            // Register IPN endpoint
             const ipnResp = await axiosClient.post('/URLSetup/RegisterIPN', {
-                "url": "https://resolvemchango-frbu33fema-uc.a.run.app",
-                "ipn_notification_type": "GET"
+                url: RESOLVE_PAYMENT_URL,
+                ipn_notification_type: "GET",
             }, {
-                headers: {
-                    Authorization: `Bearer ${authKey}`
-                }
+                headers: { Authorization: `Bearer ${authKey}` }
             });
             const ipnData = ipnResp.data;
-            if (ipnData.status != 200) return res.json({
-                error: {
-                    message: "IPN Registration failed"
-                }
-            });
+            if (ipnData.status != 200) {
+                return res.json({ error: { message: "IPN registration failed" } });
+            }
             const ipn_id = ipnData.ipn_id;
-            console.log("IPN Here: ", callback_url);
-            // Constructing Submit Order
-            const paymentRef = db.collection(paymentsCol).doc();
-            const orderReqResp = await axiosClient.post("/Transactions/SubmitOrderRequest", {
-                "id": paymentRef.id,
-                "currency": "TZS",
-                "amount": amount,
-                "description": "Payment description goes here",
-                "callback_url": callback_url,
-                "redirect_mode": "",
-                "notification_id": ipn_id,
-                "branch": "HAFLAWAY SPA",
-                "billing_address": {
-                    "email_address": "haflaway@gmail.com",
-                    "phone_number": attendee.phone,
-                    "country_code": "TZ",
-                    "first_name": attendee.fullName,
-                    "middle_name": "",
-                    "last_name": "Doe",
-                    "line_1": "Pesapal Limited",
-                    "line_2": "",
-                    "city": "",
-                    "state": "",
-                    "postal_code": "",
-                    "zip_code": ""
+
+            // Create the subscription record first so we have its ID as the order ID
+            const subscriptionRef = db.collection(subscriptionsCol).doc();
+
+            // Submit order to PesaPal
+            const orderResp = await axiosClient.post("/Transactions/SubmitOrderRequest", {
+                id: subscriptionRef.id,
+                currency: pkg.currency || "TZS",
+                amount: pkg.price,
+                description: `${pkg.name} - Nguvu ya Upendo`,
+                callback_url: callback_url,
+                redirect_mode: "",
+                notification_id: ipn_id,
+                branch: "NGUVU YA UPENDO",
+                billing_address: {
+                    email_address: user.email || "",
+                    phone_number: user.phone || "",
+                    country_code: "TZ",
+                    first_name: user.fullName || "User",
+                    middle_name: "",
+                    last_name: "",
+                    line_1: "",
+                    line_2: "",
+                    city: "",
+                    state: "",
+                    postal_code: "",
+                    zip_code: "",
                 },
             }, {
-                headers: {
-                    Authorization: `Bearer ${authKey}`
-                }
-            }
-            );
-            var orderReqRespData = orderReqResp.data
-            if (orderReqRespData.status != 200) return res.json({
-                error: {
-                    message: orderReqRespData.error
-                }
-            });
-            var trnObject = {
-                "order_tracking_id": orderReqRespData.order_tracking_id,
-                "merchant_reference": orderReqRespData.merchant_reference,
-                "eventId": userId,
-                "attendeeId": attendee.id,
-                "expected_amount": amount,
-                "redirect_url": orderReqRespData.redirect_url,
-                "payment_status_description": "INVOKED",
-                created_at: FieldValue.serverTimestamp()
-            }
-            await paymentRef.set(trnObject);
-            trnObject.error = null;
-            return res.json(trnObject);
-        } catch (error) {
-            return res.json({ error: { message: error } });
-        }
-    });
-
-
-const recalculateUserPaid = onDocumentWritten(`${eventsCol}/{eventId}/${attendeesCol}/{attendeeId}/${attendeePaymentsCol}/{paymentId}`,
-    async (event) => {
-        try {
-            const eventId = event.params.eventId;
-            const attendeeId = event.params.attendeeId;
-            const db = getFirestore();
-            var attPaysSnap = await db.collection(eventsCol)
-                .doc(eventId)
-                .collection(attendeesCol)
-                .doc(attendeeId)
-                .collection(attendeePaymentsCol)
-                .get();
-
-            if (attPaysSnap.empty)
-                console.log("Shida: Attendee hana payments");
-
-            let totalPay = 0.0;
-
-            attPaysSnap.forEach(doc => {
-                const payData = doc.data();
-                totalPay += payData.amount ?? 0.0;
+                headers: { Authorization: `Bearer ${authKey}` }
             });
 
-            await db.collection(eventsCol)
-                .doc(eventId)
-                .collection(attendeesCol)
-                .doc(attendeeId).set({
-                    paidAmount: totalPay
-                }, { merge: true });
+            const orderData = orderResp.data;
+            if (orderData.status != 200) {
+                return res.json({ error: { message: orderData.error || "Order submission failed" } });
+            }
+
+            // Persist pending subscription record
+            await subscriptionRef.set({
+                userId,
+                packageId,
+                packageName: pkg.name,
+                durationDays: pkg.durationDays,
+                amount: pkg.price,
+                currency: pkg.currency || "TZS",
+                order_tracking_id: orderData.order_tracking_id,
+                merchant_reference: orderData.merchant_reference,
+                redirect_url: orderData.redirect_url,
+                status: "PENDING",
+                created_at: FieldValue.serverTimestamp(),
+            });
+
+            return res.json({
+                error: null,
+                redirect_url: orderData.redirect_url,
+                order_tracking_id: orderData.order_tracking_id,
+                merchant_reference: orderData.merchant_reference,
+                subscription_id: subscriptionRef.id,
+            });
 
         } catch (error) {
-            return console.log("Shida: ", error);
+            console.error("subscribe error:", error);
+            return res.status(500).json({ error: { message: error.message || String(error) } });
         }
-        // perform more operations ...
-    });
+    }
+);
 
-
-module.exports = {
-    lipaMchango,
-    recalculateUserPaid
-};
+module.exports = { subscribe };
