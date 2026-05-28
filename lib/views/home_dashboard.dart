@@ -670,11 +670,40 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       },
                     )
                   else
-                    Image.asset(
-                      'assets/images/cover.jpg',
+                    Container(
                       height: 155,
                       width: double.infinity,
-                      fit: BoxFit.cover,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF0D1B4B),
+                            Color(0xFF00008B),
+                            Color(0xFF1A0050),
+                          ],
+                        ),
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withAlpha(18),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(28),
+                            child: Image.asset(
+                              'assets/images/logo.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   // Subtle bottom gradient on image
                   Positioned(

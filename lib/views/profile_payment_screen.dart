@@ -194,7 +194,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Image.asset('assets/images/moyo_logo.png', height: 55, fit: BoxFit.contain),
+                Image.asset('assets/images/logo.png', height: 55, fit: BoxFit.contain),
                 const SizedBox(height: 24),
 
                 // Body — swaps by state

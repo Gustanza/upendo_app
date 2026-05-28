@@ -122,37 +122,46 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 30.0),
       child: Column(
         children: [
-          const Spacer(flex: 2),
-          // Stylized Moyo Logo
+          const Spacer(flex: 3),
           _buildMoyoLogo(),
-          const Spacer(flex: 2),
-          // Welcome Text
+          const SizedBox(height: 44),
           const Text(
             'Karibu\nKatika Upendo App',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,
               fontSize: 28,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+          Container(
+            width: 36,
+            height: 2,
+            decoration: BoxDecoration(
+              color: Colors.white38,
+              borderRadius: BorderRadius.circular(1),
+            ),
+          ),
+          const SizedBox(height: 14),
           const Text(
             'Hii ni App kwa ajili gani',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,
-              fontSize: 18,
+              fontSize: 17,
               fontWeight: FontWeight.w400,
+              letterSpacing: 0.3,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           const Text(
-            'Lorem ipsum dolor sit amet, consectetuer\nadipiscing elit, sed diam nonummy nibh\neuismod tincidunt ut laoreet dolore',
+            'Upendo App ni chanzo chako cha habari,\nmafunzo na msukumo wa kila siku.\nTunakuletea maudhui ya moyo wazi.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+            style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.7),
           ),
-          const Spacer(flex: 2),
+          const Spacer(flex: 3),
         ],
       ),
     );
@@ -207,7 +216,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 40.0),
           child: Text(
-            'Lorem ipsum dolor sit amet, consectetuer\nadipiscing elit, sed diam nonummy nibh\neuismod tincidunt ut laoreet dolore',
+            'Pata maudhui mapya kila siku, jifunze,\nna ushirikiane na jamii yenye upendo\nna mioyo iliyojaa furaha na imani.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
           ),
@@ -219,7 +228,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   Widget _buildMoyoLogo() {
     return Image.asset(
-      'assets/images/moyo_logo.png',
+      'assets/images/logo.png',
       height: 80,
       fit: BoxFit.contain,
     );

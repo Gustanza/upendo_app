@@ -450,7 +450,7 @@ class _AuthScreenState extends State<AuthScreen>
       padding: const EdgeInsets.fromLTRB(0, 28, 0, 20),
       child: Column(
         children: [
-          Image.asset('assets/images/moyo_logo.png',
+          Image.asset('assets/images/logo.png',
               height: 64, fit: BoxFit.contain),
           const SizedBox(height: 10),
           const Text(
