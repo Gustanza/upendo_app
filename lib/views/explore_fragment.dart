@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/category_service.dart';
 import '../models/category_model.dart';
+import '../widgets/category_password_dialog.dart';
 import 'category_posts_screen.dart';
 
 class ExploreFragment extends StatelessWidget {
@@ -96,36 +97,74 @@ class ExploreFragment extends StatelessWidget {
                   final category = categories[index];
 
                   return GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            CategoryPostsScreen(category: category),
-                      ),
-                    ),
+                    onTap: () async {
+                      if (category.isProtected) {
+                        final unlocked = await showDialog<bool>(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (_) =>
+                              CategoryPasswordDialog(category: category),
+                        );
+                        if (unlocked != true) return;
+                      }
+                      if (!context.mounted) return;
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              CategoryPostsScreen(category: category),
+                        ),
+                      );
+                    },
                     child: Column(
                       children: [
-                        Container(
-                          width: 90,
-                          height: 90,
-                          decoration: BoxDecoration(
-                            color: category.color,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
+                        Stack(
+                          children: [
+                            Container(
+                              width: 90,
+                              height: 90,
+                              decoration: BoxDecoration(
+                                color: category.color,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Icon(
-                              category.icon,
-                              color: Colors.white,
-                              size: 45,
+                              child: Center(
+                                child: Icon(
+                                  category.icon,
+                                  color: Colors.white,
+                                  size: 45,
+                                ),
+                              ),
                             ),
-                          ),
+                            if (category.isProtected)
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: category.color,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.lock_rounded,
+                                    size: 13,
+                                    color: category.color,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         Text(

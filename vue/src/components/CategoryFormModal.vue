@@ -59,11 +59,70 @@
             />
           </div>
         </div>
+
+        <!-- Password Protection -->
+        <div class="field">
+          <label class="toggle-row">
+            <span>Protect with password</span>
+            <button
+              type="button"
+              class="toggle-track"
+              :class="{ active: form.isProtected }"
+              @click="form.isProtected = !form.isProtected"
+              role="switch"
+              :aria-checked="form.isProtected"
+            >
+              <span class="toggle-thumb" />
+            </button>
+          </label>
+        </div>
+
+        <template v-if="form.isProtected">
+          <div class="field">
+            <label>Password</label>
+            <p v-if="isEdit && wasProtected" class="field-hint">
+              Leave blank to keep the current password.
+            </p>
+            <div class="password-row">
+              <input
+                v-model="form.password"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="Enter password"
+                class="text-input"
+              />
+              <button type="button" class="eye-btn" @click="showPassword = !showPassword">
+                <svg v-if="showPassword" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="form.password" class="field">
+            <label>Confirm Password</label>
+            <input
+              v-model="form.confirmPassword"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="Confirm password"
+              class="text-input"
+              :class="{ 'input-error': form.confirmPassword && form.password !== form.confirmPassword }"
+            />
+            <span v-if="form.confirmPassword && form.password !== form.confirmPassword" class="field-error">
+              Passwords don't match
+            </span>
+          </div>
+        </template>
       </div>
 
       <div class="modal-footer">
         <button class="btn-cancel" @click="$emit('close')">Cancel</button>
-        <button class="btn-save" :disabled="!form.name.trim() || saving" @click="save">
+        <button class="btn-save" :disabled="!canSave" @click="save">
           {{ saving ? 'Saving…' : 'Save Category' }}
         </button>
       </div>
@@ -73,7 +132,7 @@
 
 <script setup>
 import { ref, computed, reactive } from 'vue'
-import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, doc, updateDoc, serverTimestamp, deleteField } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
 import { MATERIAL_ICONS, COLOR_OPTIONS, flutterColorToCss, iconChar } from '../utils/iconData.js'
 
@@ -82,16 +141,21 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'saved'])
 
-const isEdit = computed(() => !!props.category?.id)
+const isEdit     = computed(() => !!props.category?.id)
+const wasProtected = computed(() => !!props.category?.isProtected)
 
 const form = reactive({
-  name:     props.category?.name     ?? '',
-  iconCode: props.category?.iconCode ?? 0xe574,  // default: category icon
-  colorHex: props.category?.colorHex ?? 0xFF1565C0, // default: blue
+  name:            props.category?.name      ?? '',
+  iconCode:        props.category?.iconCode  ?? 0xe574,
+  colorHex:        props.category?.colorHex  ?? 0xFF1565C0,
+  isProtected:     props.category?.isProtected ?? false,
+  password:        '',
+  confirmPassword: '',
 })
 
-const iconSearch = ref('')
-const saving     = ref(false)
+const iconSearch  = ref('')
+const saving      = ref(false)
+const showPassword = ref(false)
 
 const filteredIcons = computed(() => {
   const q = iconSearch.value.trim().toLowerCase()
@@ -100,16 +164,40 @@ const filteredIcons = computed(() => {
 
 const selectedCssColor = computed(() => flutterColorToCss(form.colorHex))
 
+// Password is required when turning on protection for the first time (new or previously unprotected)
+const passwordRequired = computed(() =>
+  form.isProtected && (!isEdit.value || !wasProtected.value)
+)
+
+const canSave = computed(() => {
+  if (!form.name.trim() || saving.value) return false
+  if (passwordRequired.value && !form.password) return false
+  if (form.password && form.password !== form.confirmPassword) return false
+  return true
+})
+
+async function sha256(message) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 async function save() {
-  if (!form.name.trim()) return
   saving.value = true
   try {
     const payload = {
       name:      form.name.trim(),
       iconCode:  form.iconCode,
       colorHex:  form.colorHex,
+      isProtected: form.isProtected,
       updatedAt: serverTimestamp(),
     }
+
+    if (form.isProtected && form.password) {
+      payload.passwordHash = await sha256(form.password)
+    } else if (!form.isProtected) {
+      payload.passwordHash = deleteField()
+    }
+
     if (isEdit.value) {
       await updateDoc(doc(db, 'categories', props.category.id), payload)
     } else {
@@ -184,8 +272,86 @@ async function save() {
   outline: none;
   transition: border-color .15s;
   color: #1a1d2e;
+  width: 100%;
+  box-sizing: border-box;
 }
 .text-input:focus { border-color: #3b4cca; }
+.input-error { border-color: #dc2626 !important; }
+
+.field-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.field-error {
+  font-size: 12px;
+  color: #dc2626;
+}
+
+/* Toggle */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  cursor: default;
+}
+
+.toggle-track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: none;
+  background: #d1d5db;
+  cursor: pointer;
+  transition: background .2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.toggle-track.active { background: #3b4cca; }
+
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform .2s;
+  display: block;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.toggle-track.active .toggle-thumb { transform: translateX(20px); }
+
+/* Password row */
+.password-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.password-row .text-input { flex: 1; }
+
+.eye-btn {
+  width: 38px;
+  height: 38px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #6b7280;
+  transition: all .12s;
+}
+.eye-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
+.eye-btn svg { width: 16px; height: 16px; }
 
 .icon-search-row {
   display: flex;
@@ -290,7 +456,6 @@ async function save() {
 .btn-save:hover:not(:disabled) { background: #2f3da0; }
 .btn-save:disabled { opacity: .5; cursor: not-allowed; }
 
-/* Material Icons font rendering */
 .mi {
   font-family: 'Material Icons';
   font-style: normal;

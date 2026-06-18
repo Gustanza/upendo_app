@@ -34,7 +34,10 @@
                 <span class="mi">{{ iconChar(cat.iconCode) }}</span>
               </div>
             </td>
-            <td class="cat-name">{{ cat.name }}</td>
+            <td class="cat-name">
+              {{ cat.name }}
+              <span v-if="cat.isProtected" class="lock-badge mi" title="Password protected">lock</span>
+            </td>
             <td>
               <span class="color-dot" :style="{ background: cssColor(cat.colorHex) }"></span>
             </td>
@@ -128,8 +131,9 @@ onMounted(() => {
       return {
         id: d.id,
         ...data,
-        iconCode: data.iconCode  ?? 0xe2cc,
-        colorHex: data.colorHex  ?? 0xFF1565C0,
+        iconCode:    data.iconCode    ?? 0xe2cc,
+        colorHex:    data.colorHex    ?? 0xFF1565C0,
+        isProtected: data.isProtected ?? false,
       }
     })
     loading.value = false
@@ -256,7 +260,19 @@ function onSaved() {
 }
 .icon-badge .mi { color: #fff; font-size: 22px; }
 
-.cat-name { font-size: 15px; font-weight: 600; color: #1a1d2e; }
+.cat-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1d2e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lock-badge {
+  font-size: 16px;
+  color: #6b7280;
+}
 
 .color-dot {
   display: inline-block;

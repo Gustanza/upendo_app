@@ -4,7 +4,8 @@
       "Bash(npm run *)",
       "Bash(xargs grep *)",
       "Bash(firebase --version)",
-      "Bash(dart analyze *)"
+      "Bash(dart analyze *)",
+      "Bash(flutter pub *)"
     ]
   }
 }
