@@ -31,6 +31,11 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/><path d="M8 7V5a2 2 0 0 1 4 0v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
           Packages
         </RouterLink>
+
+        <RouterLink to="/notifications" class="nav-item" active-class="active">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          Notifications
+        </RouterLink>
       </nav>
     </aside>
 
@@ -68,6 +73,7 @@ const pageTitle = computed(() => {
   if (route.path === '/categories') return 'Categories'
   if (route.path === '/users') return 'Users'
   if (route.path === '/packages') return 'Packages'
+  if (route.path === '/notifications') return 'Notifications'
   return 'Overview'
 })
 

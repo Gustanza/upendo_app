@@ -77,47 +77,45 @@
           </label>
         </div>
 
-        <template v-if="form.isProtected">
-          <div class="field">
-            <label>Password</label>
-            <p v-if="isEdit && wasProtected" class="field-hint">
-              Leave blank to keep the current password.
-            </p>
-            <div class="password-row">
-              <input
-                v-model="form.password"
-                :type="showPassword ? 'text' : 'password'"
-                placeholder="Enter password"
-                class="text-input"
-              />
-              <button type="button" class="eye-btn" @click="showPassword = !showPassword">
-                <svg v-if="showPassword" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                </svg>
-                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <div v-if="form.password" class="field">
-            <label>Confirm Password</label>
+        <div class="field">
+          <label>Password</label>
+          <p v-if="isEdit && wasProtected" class="field-hint">
+            Leave blank to keep the current password.
+          </p>
+          <div class="password-row">
             <input
-              v-model="form.confirmPassword"
+              v-model="form.password"
               :type="showPassword ? 'text' : 'password'"
-              placeholder="Confirm password"
+              placeholder="Enter password"
               class="text-input"
-              :class="{ 'input-error': form.confirmPassword && form.password !== form.confirmPassword }"
             />
-            <span v-if="form.confirmPassword && form.password !== form.confirmPassword" class="field-error">
-              Passwords don't match
-            </span>
+            <button type="button" class="eye-btn" @click="showPassword = !showPassword">
+              <svg v-if="showPassword" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
           </div>
-        </template>
+        </div>
+
+        <div v-if="form.password" class="field">
+          <label>Confirm Password</label>
+          <input
+            v-model="form.confirmPassword"
+            :type="showPassword ? 'text' : 'password'"
+            placeholder="Confirm password"
+            class="text-input"
+            :class="{ 'input-error': form.confirmPassword && form.password !== form.confirmPassword }"
+          />
+          <span v-if="form.confirmPassword && form.password !== form.confirmPassword" class="field-error">
+            Passwords don't match
+          </span>
+        </div>
       </div>
 
       <div class="modal-footer">
@@ -194,7 +192,7 @@ async function save() {
 
     if (form.isProtected && form.password) {
       payload.passwordHash = await sha256(form.password)
-    } else if (!form.isProtected) {
+    } else if (!form.isProtected && isEdit.value) {
       payload.passwordHash = deleteField()
     }
 

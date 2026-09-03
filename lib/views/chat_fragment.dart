@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../models/user_model.dart';
-import '../services/user_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/thread_post_model.dart';
+import '../services/thread_post_service.dart';
+import '../utils/time_ago.dart';
+import '../widgets/thread_stats_row.dart';
+import 'thread_compose_sheet.dart';
+import 'thread_detail_screen.dart';
 
 class ChatFragment extends StatefulWidget {
   const ChatFragment({super.key});
@@ -12,10 +16,10 @@ class ChatFragment extends StatefulWidget {
 }
 
 class _ChatFragmentState extends State<ChatFragment> {
-  final UserService _userService = UserService();
+  final ThreadPostService _postService = ThreadPostService();
   final ScrollController _scrollController = ScrollController();
 
-  final List<UserModel> _users = [];
+  final List<ThreadPostModel> _posts = [];
   DocumentSnapshot? _lastDocument;
   bool _isLoading = false;
   bool _hasMore = true;
@@ -23,7 +27,7 @@ class _ChatFragmentState extends State<ChatFragment> {
   @override
   void initState() {
     super.initState();
-    _fetchUsers();
+    _fetchPosts();
     _scrollController.addListener(_onScroll);
   }
 
@@ -38,69 +42,65 @@ class _ChatFragmentState extends State<ChatFragment> {
             _scrollController.position.maxScrollExtent - 200 &&
         !_isLoading &&
         _hasMore) {
-      _fetchUsers();
+      _fetchPosts();
     }
   }
 
-  Future<void> _fetchUsers() async {
+  Future<void> _fetchPosts() async {
     if (_isLoading) return;
-
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      final newUsers = await _userService.getUsers(
+      final result = await _postService.getFeed(
         startAfter: _lastDocument,
-        limit: 20,
+        limit: 15,
       );
-
-      if (newUsers.length < 20) {
-        _hasMore = false;
-      }
-
-      if (newUsers.isNotEmpty) {
-        // Need to get the last document for the next page
-        final snapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .orderBy('fullName')
-            .startAt([newUsers.last.fullName])
-            .limit(1)
-            .get();
-
-        if (snapshot.docs.isNotEmpty) {
-          _lastDocument = snapshot.docs.first;
-        }
-      }
+      if (result.posts.length < 15) _hasMore = false;
+      if (result.lastDoc != null) _lastDocument = result.lastDoc;
 
       setState(() {
-        _users.addAll(newUsers);
+        _posts.addAll(result.posts);
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error fetching users: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      debugPrint('Error fetching thread posts: $e');
+      setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _launchWhatsApp(String phone) async {
-    // Ensure phone number is in international format without + or extra chars for wa.me
-    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    final url = 'https://wa.me/$cleanPhone';
-    final uri = Uri.parse(url);
-
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      debugPrint('Could not launch WhatsApp: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error launching WhatsApp: $e')));
-      }
+  Future<void> _openCompose() async {
+    final posted = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const ThreadComposeSheet(),
+    );
+    if (posted == true) {
+      setState(() {
+        _posts.clear();
+        _lastDocument = null;
+        _hasMore = true;
+      });
+      await _fetchPosts();
     }
+  }
+
+  Future<void> _openThread(ThreadPostModel post) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ThreadDetailScreen(post: post)),
+    );
+    final updated = await _postService.getPostById(post.id);
+    if (!mounted) return;
+    setState(() {
+      if (updated == null) {
+        _posts.removeWhere((p) => p.id == post.id);
+      } else {
+        final index = _posts.indexWhere((p) => p.id == updated.id);
+        if (index != -1) _posts[index] = updated;
+      }
+    });
   }
 
   @override
@@ -129,7 +129,7 @@ class _ChatFragmentState extends State<ChatFragment> {
           ),
           child: const Center(
             child: Text(
-              'Zungumza na Wanachama',
+              'Ukuta wa Jumuiya',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white,
@@ -140,137 +140,182 @@ class _ChatFragmentState extends State<ChatFragment> {
           ),
         ),
 
-        // User List
+        // Feed
         Expanded(
-          child: _users.isEmpty && _isLoading
+          child: _posts.isEmpty && _isLoading
               ? const Center(child: CircularProgressIndicator())
               : RefreshIndicator(
                   onRefresh: () async {
                     setState(() {
-                      _users.clear();
+                      _posts.clear();
                       _lastDocument = null;
                       _hasMore = true;
                     });
-                    await _fetchUsers();
+                    await _fetchPosts();
                   },
-                  child: ListView.builder(
+                  child: ListView(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(15),
-                    itemCount: _users.length + (_hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == _users.length) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 20),
-                            child: CircularProgressIndicator(),
+                    children: [
+                      _buildComposePrompt(),
+                      const SizedBox(height: 15),
+                      if (_posts.isEmpty && !_isLoading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: Center(
+                            child: Text(
+                              'Hakuna chapisho bado. Kuwa wa kwanza kuchapisha!',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ),
-                        );
-                      }
-
-                      final user = _users[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 15),
-                        padding: const EdgeInsets.all(15),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
                         ),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 30,
-                                  backgroundColor: Colors.blue.shade100,
-                                  child: Text(
-                                    user.fullName.isNotEmpty
-                                        ? user.fullName[0].toUpperCase()
-                                        : '?',
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue.shade800,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 15),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        user.fullName,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 5),
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.location_on,
-                                            size: 14,
-                                            color: Colors.grey,
-                                          ),
-                                          const SizedBox(width: 5),
-                                          Expanded(
-                                            child: Text(
-                                              '${user.region}, ${user.country}',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: Colors.grey,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Divider(height: 25, thickness: 0.5),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: ElevatedButton.icon(
-                                onPressed: () => _launchWhatsApp(user.phone),
-                                icon: const Icon(Icons.chat, size: 18),
-                                label: const Text('Zungumza'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 10,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                      ..._posts.map(_buildPostCard),
+                      if (_hasMore)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Center(child: CircularProgressIndicator()),
                         ),
-                      );
-                    },
+                    ],
                   ),
                 ),
         ),
       ],
+    );
+  }
+
+  Widget _buildComposePrompt() {
+    return GestureDetector(
+      onTap: _openCompose,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const CircleAvatar(
+              radius: 18,
+              backgroundColor: Color(0xFFE8EAF6),
+              child: Icon(Icons.person, color: Color(0xFF0077C2), size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Unafikiria nini?',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+            ),
+            const Icon(Icons.image_outlined, color: Color(0xFF0077C2)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPostCard(ThreadPostModel post) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final isOwner = post.authorId == currentUid;
+
+    return GestureDetector(
+      onTap: () => _openThread(post),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 15),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Colors.blue.shade100,
+                  child: Text(
+                    post.authorName.isNotEmpty
+                        ? post.authorName[0].toUpperCase()
+                        : '?',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        post.authorName,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      Text(
+                        timeAgo(post.createdAt),
+                        style: const TextStyle(color: Colors.grey, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isOwner)
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () async {
+                      await _postService.deletePost(post.id);
+                      if (mounted) setState(() => _posts.remove(post));
+                    },
+                    icon: const Icon(Icons.delete_outline, size: 18, color: Colors.grey),
+                  ),
+              ],
+            ),
+            if (post.text.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                post.text,
+                maxLines: 6,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+            ],
+            if (post.imageUrl != null) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.network(
+                  post.imageUrl!,
+                  width: double.infinity,
+                  height: 200,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            ThreadStatsRow(
+              postId: post.id,
+              likeCount: post.likeCount,
+              commentCount: post.commentCount,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../models/post_model.dart';
+import '../models/comment_model.dart';
 import '../services/user_preferences.dart';
+import '../services/post_interaction_service.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostModel post;
@@ -18,6 +21,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   ChewieController? _chewieController;
   bool _isPlayerInitialized = false;
   final UserPreferences _userPreferences = UserPreferences();
+  final PostInteractionService _interactionService = PostInteractionService();
   bool _isSaved = false;
 
   @override
@@ -304,20 +308,35 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       ),
       child: Row(
         children: [
+          _buildLikeButton(),
+          const SizedBox(width: 12),
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              height: 45,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: const [
-                  Icon(Icons.chat_bubble_outline, size: 20, color: Colors.grey),
-                  SizedBox(width: 10),
-                  Text('Comments', style: TextStyle(color: Colors.grey)),
-                ],
+            child: GestureDetector(
+              onTap: _openComments,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 15),
+                height: 45,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.chat_bubble_outline,
+                        size: 20, color: Colors.grey),
+                    const SizedBox(width: 10),
+                    StreamBuilder<int>(
+                      stream: _interactionService.commentCount(widget.post.id),
+                      builder: (context, snapshot) {
+                        final count = snapshot.data ?? widget.post.commentCount;
+                        return Text(
+                          count > 0 ? 'Comments ($count)' : 'Comments',
+                          style: const TextStyle(color: Colors.grey),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -331,6 +350,231 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             child: const Icon(Icons.edit_note, color: Colors.blue),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLikeButton() {
+    return StreamBuilder<bool>(
+      stream: _interactionService.likedByMe(widget.post.id),
+      builder: (context, likedSnapshot) {
+        final isLiked = likedSnapshot.data ?? false;
+        return StreamBuilder<int>(
+          stream: _interactionService.likeCount(widget.post.id),
+          builder: (context, countSnapshot) {
+            final count = countSnapshot.data ?? widget.post.likeCount;
+            return GestureDetector(
+              onTap: () => _interactionService.toggleLike(widget.post.id),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                decoration: BoxDecoration(
+                  color: isLiked
+                      ? const Color(0xFFFFE5EA)
+                      : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isLiked ? Icons.favorite : Icons.favorite_border,
+                      size: 20,
+                      color: isLiked ? Colors.redAccent : Colors.grey,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$count',
+                      style: TextStyle(
+                        color: isLiked ? Colors.redAccent : Colors.grey,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openComments() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _CommentsSheet(
+        postId: widget.post.id,
+        interactionService: _interactionService,
+      ),
+    );
+  }
+}
+
+class _CommentsSheet extends StatefulWidget {
+  final String postId;
+  final PostInteractionService interactionService;
+
+  const _CommentsSheet({
+    required this.postId,
+    required this.interactionService,
+  });
+
+  @override
+  State<_CommentsSheet> createState() => _CommentsSheetState();
+}
+
+class _CommentsSheetState extends State<_CommentsSheet> {
+  final TextEditingController _controller = TextEditingController();
+  bool _isSending = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _isSending) return;
+    setState(() => _isSending = true);
+    try {
+      await widget.interactionService.addComment(widget.postId, text);
+      _controller.clear();
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.75,
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Comments',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            Expanded(
+              child: StreamBuilder<List<CommentModel>>(
+                stream: widget.interactionService.getComments(widget.postId),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final comments = snapshot.data ?? [];
+                  if (comments.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.chat_bubble_outline,
+                              size: 56, color: Colors.grey[300]),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No comments yet.',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: comments.length,
+                    separatorBuilder: (context, index) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final comment = comments[index];
+                      final isOwner = comment.userId == currentUid;
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: const Color(0xFFE8EAF6),
+                          child: Text(
+                            comment.userName.isNotEmpty
+                                ? comment.userName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(color: Color(0xFF0077C2)),
+                          ),
+                        ),
+                        title: Text(
+                          comment.userName,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(comment.text),
+                        trailing: isOwner
+                            ? IconButton(
+                                icon: const Icon(Icons.delete_outline,
+                                    size: 20, color: Colors.grey),
+                                onPressed: () => widget.interactionService
+                                    .deleteComment(widget.postId, comment.id),
+                              )
+                            : null,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      decoration: InputDecoration(
+                        hintText: 'Andika maoni...',
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                      ),
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _send(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: _isSending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send, color: Color(0xFF0077C2)),
+                    onPressed: _isSending ? null : _send,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

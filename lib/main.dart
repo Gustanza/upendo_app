@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:upendo_app/views/home_dashboard.dart';
 import 'package:upendo_app/views/welcome_screen.dart';
@@ -9,11 +10,42 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
 // ...
-const lokol = "192.168.2.197"; 
+const lokol = "192.168.2.197";
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await FirebaseMessaging.instance.requestPermission();
+  // Wait for a valid FCM token before subscribing, avoiding the
+  // "Topic subscribe failed: Not Found" error on first launch.
+  Future<void> registerToken(String token) async {
+    await FirebaseFunctions.instance
+        .httpsCallable('registerFcmToken')
+        .call({'token': token});
+  }
+
+  final token = await FirebaseMessaging.instance.getToken();
+  if (token != null) {
+    try {
+      await registerToken(token);
+    } catch (e) {
+      debugPrint('FCM register error: $e');
+    }
+  }
+
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+    try {
+      await registerToken(newToken);
+    } catch (e) {
+      debugPrint('FCM re-register error: $e');
+    }
+  });
   // if (kDebugMode) {
   //   try {
   //     // FirebaseStorage storage = FirebaseStorage.instance;

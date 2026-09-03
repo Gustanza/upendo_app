@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/post_model.dart';
 import '../services/post_service.dart';
+import '../widgets/post_stats_row.dart';
 import 'post_detail_screen.dart';
 
 class PostSearchDelegate extends SearchDelegate<PostModel?> {
@@ -90,11 +91,25 @@ class PostSearchDelegate extends SearchDelegate<PostModel?> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              subtitle: Text(
-                post.subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    post.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  PostStatsRow(
+                    postId: post.id,
+                    likeCount: post.likeCount,
+                    commentCount: post.commentCount,
+                    fontSize: 11,
+                  ),
+                ],
               ),
+              isThreeLine: true,
               trailing: const Icon(Icons.chevron_right, size: 20),
               onTap: () {
                 Navigator.of(context).push(
