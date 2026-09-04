@@ -25,6 +25,7 @@ const {
   notifyThreadReply,
   notifyThreadLike,
 }                                         = require('./interactions/activityNotifications');
+const { notifyConversationMessage }      = require('./interactions/messageNotifications');
 
 exports.subscribe                      = subscribe;
 exports.resolvePayment                 = resolvePayment;
@@ -39,6 +40,7 @@ exports.notifyPostComment              = notifyPostComment;
 exports.notifyPostLike                 = notifyPostLike;
 exports.notifyThreadReply              = notifyThreadReply;
 exports.notifyThreadLike               = notifyThreadLike;
+exports.notifyConversationMessage      = notifyConversationMessage;
 
 exports.registerFcmToken = onCall(async (request) => {
   const token = request.data.token;

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/thread_post_model.dart';
 import '../models/thread_reply_model.dart';
+import '../services/conversation_service.dart';
 import '../services/thread_interaction_service.dart';
 import '../services/thread_post_service.dart';
 import '../utils/time_ago.dart';
 import '../widgets/thread_stats_row.dart';
+import 'conversation_screen.dart';
 
 class ThreadDetailScreen extends StatefulWidget {
   final ThreadPostModel post;
@@ -63,6 +65,22 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
     }
   }
 
+  Future<void> _messageAuthor() async {
+    final conversationId = await ConversationService().getOrCreateConversation(
+      otherUid: widget.post.authorId,
+      otherName: widget.post.authorName,
+    );
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ConversationScreen(
+          conversationId: conversationId,
+          otherName: widget.post.authorName,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
@@ -80,6 +98,12 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             IconButton(
               onPressed: _confirmDeletePost,
               icon: const Icon(Icons.delete_outline),
+            )
+          else
+            IconButton(
+              onPressed: _messageAuthor,
+              icon: const Icon(Icons.chat_bubble_outline),
+              tooltip: 'Tuma ujumbe',
             ),
         ],
       ),

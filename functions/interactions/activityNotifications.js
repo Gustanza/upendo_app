@@ -1,24 +1,6 @@
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
-const { transitionDelta } = require('./_util');
-
-// Writes a targeted notifications/{...} doc for `recipientId`. Skips when
-// there's no recipient to notify, or when the actor would be notifying
-// themselves (e.g. liking/commenting on their own post). sendPushNotification
-// (functions/index.js) picks this doc up and delivers the push to the
-// recipient's stored FCM tokens — this function only records the activity.
-async function notifyRecipient({ recipientId, actorId, title, body, type, postId }) {
-  if (!recipientId || recipientId === actorId) return;
-  await getFirestore().collection('notifications').add({
-    recipientId,
-    title,
-    body,
-    notify: true,
-    type,
-    postId,
-    createdAt: FieldValue.serverTimestamp(),
-  });
-}
+const { getFirestore } = require('firebase-admin/firestore');
+const { transitionDelta, notifyRecipient } = require('./_util');
 
 const notifyPostComment = onDocumentWritten('posts/{postId}/comments/{commentId}', async (event) => {
   if (transitionDelta(event) !== 1) return;

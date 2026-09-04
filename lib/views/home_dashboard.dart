@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:in_app_update/in_app_update.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:upendo_app/views/explore_fragment.dart';
 import 'package:upendo_app/views/chat_fragment.dart';
+import 'package:upendo_app/views/conversations_screen.dart';
 import 'package:upendo_app/views/post_detail_screen.dart';
 import 'package:upendo_app/views/account_fragment.dart';
 import 'package:upendo_app/views/post_search_delegate.dart';
@@ -13,9 +15,11 @@ import 'package:upendo_app/views/saved_fragment.dart';
 import 'package:upendo_app/views/notifications_screen.dart';
 import '../models/post_model.dart';
 import '../models/notification_model.dart';
+import '../models/conversation_model.dart';
 import '../services/post_service.dart';
 import '../services/user_preferences.dart';
 import '../services/notification_service.dart';
+import '../services/conversation_service.dart';
 import '../widgets/post_stats_row.dart';
 
 class HomeDashboard extends StatefulWidget {
@@ -49,6 +53,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
   int _notifLastSeenMs = 0;
   Stream<List<AppNotification>>? _notifStream;
 
+  int _convLastSeenMs = 0;
+  Stream<List<ConversationModel>>? _convStream;
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +63,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
     _fetchHotPosts();
     _loadUserData();
     _initNotifications();
+    _initConversations();
     _hotScrollController.addListener(_onHotScroll);
     _checkForUpdate();
   }
@@ -73,6 +81,15 @@ class _HomeDashboardState extends State<HomeDashboard> {
     setState(() {
       _notifLastSeenMs = prefs.getInt('notif_last_seen') ?? 0;
       _notifStream = NotificationService().getNotifications();
+    });
+  }
+
+  Future<void> _initConversations() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _convLastSeenMs = prefs.getInt('conv_last_seen') ?? 0;
+      _convStream = ConversationService().getConversations();
     });
   }
 
@@ -311,6 +328,71 @@ class _HomeDashboardState extends State<HomeDashboard> {
                                 ),
                                 child: const Icon(
                                   Icons.notifications_none_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
+                              if (hasUnread)
+                                Positioned(
+                                  top: -2,
+                                  right: -2,
+                                  child: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    StreamBuilder<List<ConversationModel>>(
+                      stream: _convStream,
+                      builder: (context, snapshot) {
+                        final myUid = FirebaseAuth.instance.currentUser?.uid;
+                        final hasUnread = (snapshot.data ?? []).any((c) =>
+                            c.lastMessageSenderId != null &&
+                            c.lastMessageSenderId != myUid &&
+                            (c.updatedAt?.millisecondsSinceEpoch ?? 0) > _convLastSeenMs);
+                        return GestureDetector(
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ConversationsScreen(),
+                              ),
+                            );
+                            final prefs = await SharedPreferences.getInstance();
+                            if (mounted) {
+                              setState(() => _convLastSeenMs =
+                                  prefs.getInt('conv_last_seen') ?? 0);
+                            }
+                          },
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withAlpha(30),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withAlpha(60),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.chat_bubble_outline_rounded,
                                   color: Colors.white,
                                   size: 22,
                                 ),
