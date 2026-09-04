@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/notification_model.dart';
+import '../models/post_model.dart';
+import '../models/thread_post_model.dart';
 import '../services/notification_service.dart';
+import '../services/post_service.dart';
+import '../services/thread_post_service.dart';
+import 'conversation_screen.dart';
+import 'post_detail_screen.dart';
+import 'thread_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -24,6 +31,72 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final stored = prefs.getInt('notif_last_seen') ?? 0;
     if (mounted) setState(() => _lastSeenMs = stored);
     await prefs.setInt('notif_last_seen', DateTime.now().millisecondsSinceEpoch);
+  }
+
+  // Shared by the comment/like and reply/threadLike branches below: await a
+  // post fetch, bail out (with feedback) if it's gone, otherwise navigate.
+  // Extracted so the null-post handling can't drift between the two copies.
+  Future<void> _openFetchedPost<T>(
+    Future<T?> Function() fetch,
+    void Function(T post) onFound,
+  ) async {
+    final post = await fetch();
+    if (!mounted) return;
+    if (post == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chapisho hili halipatikani tena.')),
+      );
+      return;
+    }
+    onFound(post);
+  }
+
+  // Routes a tap to the exact post/thread/conversation the notification is
+  // about. Any other/missing type (e.g. a legacy admin broadcast with no
+  // type) is intentionally left as a no-op tap, same as today.
+  Future<void> _openNotification(AppNotification n) async {
+    if (n.type == 'comment' || n.type == 'like') {
+      if (n.postId == null) return;
+      await _openFetchedPost<PostModel>(
+        () => PostService().getPostById(n.postId!),
+        (post) => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
+        ),
+      );
+      return;
+    }
+
+    if (n.type == 'reply' || n.type == 'threadLike') {
+      if (n.postId == null) return;
+      await _openFetchedPost<ThreadPostModel>(
+        () => ThreadPostService().getPostById(n.postId!),
+        (post) => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ThreadDetailScreen(post: post)),
+        ),
+      );
+      return;
+    }
+
+    if (n.type == 'message') {
+      if (n.conversationId == null) return;
+      // No await between here and the navigation today, so this mounted
+      // check isn't currently load-bearing — kept for consistency with the
+      // two branches above and so it's already correct if this branch ever
+      // gains an async step (e.g. resolving otherName instead of reusing
+      // n.title).
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ConversationScreen(
+            conversationId: n.conversationId!,
+            otherName: n.title,
+          ),
+        ),
+      );
+    }
   }
 
   String _formatDate(DateTime? dt) {
@@ -90,6 +163,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 child: ListTile(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  onTap: () => _openNotification(n),
                   leading: Container(
                     width: 44,
                     height: 44,

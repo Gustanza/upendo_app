@@ -1,21 +1,6 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
-const { notifyRecipient } = require('./_util');
-
-// Push previews are short — a long message shouldn't produce an unwieldy
-// notification body.
-const PREVIEW_LENGTH = 80;
-
-function truncate(text) {
-  // String.prototype.slice cuts by UTF-16 code unit, which can split a
-  // surrogate pair (e.g. an emoji) in half and produce a broken glyph in
-  // the push body. Array.from iterates by Unicode code point instead, so
-  // truncation always lands on a whole-character boundary.
-  const codePoints = Array.from(text);
-  return codePoints.length > PREVIEW_LENGTH
-    ? `${codePoints.slice(0, PREVIEW_LENGTH - 1).join('')}…`
-    : text;
-}
+const { notifyRecipient, truncate } = require('./_util');
 
 // Messages are never updated/deleted by clients (see firestore.rules), so
 // this only ever needs to react to creation — no transitionDelta needed

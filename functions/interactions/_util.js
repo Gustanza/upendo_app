@@ -32,4 +32,37 @@ async function notifyRecipient({ recipientId, actorId, title, body, ...extra }) 
   });
 }
 
-module.exports = { transitionDelta, notifyRecipient };
+// Writes a public-broadcast notifications/{...} doc — no recipientId (sent
+// as null), which sendPushNotification (functions/index.js) reads as "send
+// to the upendo_all topic" rather than one user's stored FCM tokens. Use
+// this — not notifyRecipient — when there's deliberately no single person
+// to notify (e.g. activity on admin-curated /posts content, which has no
+// author field): notifyRecipient's falsy-recipientId check exists to skip
+// when there's truly nobody to notify, not to mean "notify everyone".
+async function notifyBroadcast({ title, body, ...extra }) {
+  await getFirestore().collection('notifications').add({
+    recipientId: null,
+    title,
+    body,
+    notify: true,
+    createdAt: FieldValue.serverTimestamp(),
+    ...extra,
+  });
+}
+
+// Push previews are short — a long comment/message shouldn't produce an
+// unwieldy notification body.
+const PREVIEW_LENGTH = 80;
+
+function truncate(text) {
+  // String.prototype.slice cuts by UTF-16 code unit, which can split a
+  // surrogate pair (e.g. an emoji) in half and produce a broken glyph in
+  // the push body. Array.from iterates by Unicode code point instead, so
+  // truncation always lands on a whole-character boundary.
+  const codePoints = Array.from(text);
+  return codePoints.length > PREVIEW_LENGTH
+    ? `${codePoints.slice(0, PREVIEW_LENGTH - 1).join('')}…`
+    : text;
+}
+
+module.exports = { transitionDelta, notifyRecipient, notifyBroadcast, truncate };

@@ -41,6 +41,16 @@ class NotificationService {
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => AppNotification.fromFirestore(d.id, d.data()))
+            // A broadcast comment/like notification records who acted
+            // (actorId) — a topic-based push can't exclude that person's
+            // device, but the in-app list can at least not show you a
+            // notification about your own comment/like. Most broadcasts
+            // (e.g. admin compose) have no actorId at all, so this must
+            // only exclude when actorId is actually set AND matches —
+            // otherwise a signed-out uid (null) would spuriously match an
+            // actor-less broadcast's null actorId.
+            .where((n) =>
+                n.recipientId != null || n.actorId == null || n.actorId != uid)
             .toList());
   }
 }
