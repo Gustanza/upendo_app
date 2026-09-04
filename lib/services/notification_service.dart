@@ -13,18 +13,25 @@ class NotificationService {
   //
   // Known limitation: any notification doc created before this feature
   // shipped has no recipientId field at all (the old admin compose flow
-  // never wrote one), and `isEqualTo: null` only matches docs where the
-  // field is explicitly present and null — so pre-deploy notifications
-  // won't appear in this feed. Everything created from the deploy forward
-  // (broadcast or targeted) is unaffected.
+  // never wrote one), and matching on recipientId == null only matches docs
+  // where the field is explicitly present and null — so pre-deploy
+  // notifications won't appear in this feed. Everything created from the
+  // deploy forward (broadcast or targeted) is unaffected.
   Stream<List<AppNotification>> getNotifications() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final col = FirebaseFirestore.instance.collection('notifications');
 
+    // Deliberately isNull: true, not isEqualTo: null — the Filter
+    // constructor counts non-null named-operator arguments to enforce
+    // "exactly one operator", and a null *value* passed to isEqualTo is
+    // indistinguishable from the parameter not being passed at all, so
+    // isEqualTo: null always fails that assertion at construction time
+    // (before any network call — this crashed every call to this method).
+    // isNull: true produces the identical underlying '==' / null query.
     final filter = uid == null
-        ? Filter('recipientId', isEqualTo: null)
+        ? Filter('recipientId', isNull: true)
         : Filter.or(
-            Filter('recipientId', isEqualTo: null),
+            Filter('recipientId', isNull: true),
             Filter('recipientId', isEqualTo: uid),
           );
 
