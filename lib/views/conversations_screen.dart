@@ -5,6 +5,7 @@ import '../models/conversation_model.dart';
 import '../services/conversation_service.dart';
 import '../utils/time_ago.dart';
 import 'conversation_screen.dart';
+import 'new_conversation_screen.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
@@ -43,6 +44,16 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         foregroundColor: const Color(0xFF1A1D2E),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const NewConversationScreen()),
+            ),
+            icon: const Icon(Icons.person_add_alt_1_rounded),
+            tooltip: 'Ujumbe mpya',
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(color: const Color(0xFFE8EAF0), height: 1),
