@@ -70,7 +70,38 @@ service cloud.firestore {
     match /categories/{document=**}    { allow read, write: if request.auth != null; }
     match /users/{document=**}         { allow read, write: if request.auth != null; }
     match /packages/{document=**}      { allow read, write: if request.auth != null; }
-    match /notifications/{document=**} { allow read, write: if request.auth != null; }
+    match /notifications/{notifId} {
+      // A notification is either a public broadcast (no recipientId, or
+      // recipientId explicitly null — see the admin dashboard's compose
+      // flow) or targeted at one user (recipientId == their uid, written by
+      // the Cloud Functions in functions/interactions/activityNotifications.js
+      // via the Admin SDK, which bypasses these rules anyway).
+      allow read: if request.auth != null
+        && (!('recipientId' in resource.data)
+            || resource.data.recipientId == null
+            || resource.data.recipientId == request.auth.uid);
+      // Targeted (per-user) docs are only ever written by the Cloud
+      // Functions in functions/interactions/activityNotifications.js via
+      // the Admin SDK, which bypasses these rules entirely — so a direct
+      // client (the admin dashboard, or in principle any signed-in app
+      // user) may only ever create/update/delete broadcast docs. Without
+      // this, any authenticated client could addDoc a doc with an
+      // arbitrary recipientId and get sendPushNotification to deliver a
+      // spoofed push straight to that user's device.
+      allow create: if request.auth != null
+        && (!('recipientId' in request.resource.data)
+            || request.resource.data.recipientId == null);
+      allow update: if request.auth != null
+        && (!('recipientId' in resource.data)
+            || resource.data.recipientId == null)
+        && (!('recipientId' in request.resource.data)
+            || request.resource.data.recipientId == null);
+      // request.resource isn't set on delete, so this can't reuse the
+      // update condition above — it only needs to check the existing doc.
+      allow delete: if request.auth != null
+        && (!('recipientId' in resource.data)
+            || resource.data.recipientId == null);
+    }
     // subscriptions is only ever touched by Cloud Functions (Admin SDK, bypasses
     // these rules) — this entry just avoids an implicit deny if a client ever reads it.
     match /subscriptions/{document=**} { allow read, write: if request.auth != null; }

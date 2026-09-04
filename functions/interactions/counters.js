@@ -1,13 +1,6 @@
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
-
-function transitionDelta(event) {
-  const existedBefore = event.data.before.exists;
-  const existsAfter = event.data.after.exists;
-  if (!existedBefore && existsAfter) return 1;
-  if (existedBefore && !existsAfter) return -1;
-  return 0;
-}
+const { transitionDelta } = require('./_util');
 
 const updateCommentCount = onDocumentWritten('posts/{postId}/comments/{commentId}', async (event) => {
   const delta = transitionDelta(event);

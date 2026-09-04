@@ -121,7 +121,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
 
 const notifications = ref([])
@@ -156,10 +156,14 @@ async function compose(notify) {
   saving.value = notify ? 'publish' : 'draft'
   try {
     const payload = {
-      title:     form.value.title.trim(),
-      body:      form.value.body.trim(),
+      title:       form.value.title.trim(),
+      body:        form.value.body.trim(),
       notify,
-      createdAt: serverTimestamp(),
+      // Explicit null (not just omitted) so the app's per-user notifications
+      // query — which has to filter by recipientId to satisfy firestore.rules
+      // — can still match this as a public broadcast.
+      recipientId: null,
+      createdAt:   serverTimestamp(),
     }
     if (form.value.imageUrl.trim()) payload.imageUrl = form.value.imageUrl.trim()
     await addDoc(collection(db, 'notifications'), payload)
@@ -194,7 +198,13 @@ async function doDelete() {
 let unsub = null
 
 onMounted(() => {
-  unsub = onSnapshot(collection(db, 'notifications'), snap => {
+  // This dashboard only composes/manages broadcasts, so scope the listener
+  // to those — an unconstrained query over the whole collection is rejected
+  // outright by firestore.rules once a single targeted (per-user) doc
+  // exists, since Firestore can't statically prove every possible result
+  // would satisfy the rule.
+  const notificationsQuery = query(collection(db, 'notifications'), where('recipientId', '==', null))
+  unsub = onSnapshot(notificationsQuery, snap => {
     notifications.value = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))

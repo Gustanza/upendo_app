@@ -25,19 +25,31 @@ void main() async {
   // Wait for a valid FCM token before subscribing, avoiding the
   // "Topic subscribe failed: Not Found" error on first launch.
   Future<void> registerToken(String token) async {
-    await FirebaseFunctions.instance
-        .httpsCallable('registerFcmToken')
-        .call({'token': token});
+    await FirebaseFunctions.instance.httpsCallable('registerFcmToken').call({
+      'token': token,
+    });
   }
 
-  final token = await FirebaseMessaging.instance.getToken();
-  if (token != null) {
+  // Fetches the current FCM token (if any) and (re-)registers it with the
+  // backend. Shared by the startup path below and the auth-state-change
+  // listener further down: if the token is first fetched before the user
+  // signs in, request.auth is null server-side and the token never gets
+  // attached to users/{uid}.fcmTokens — calling this again right after
+  // sign-in fixes that without waiting for the rare onTokenRefresh event.
+  Future<void> registerCurrentToken() async {
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token == null) return;
     try {
       await registerToken(token);
     } catch (e) {
       debugPrint('FCM register error: $e');
     }
   }
+
+  // Fire-and-forget: this has no UI dependency, so it shouldn't hold up
+  // runApp() (including the unauthenticated/login screen) on a network
+  // round-trip. Matches the auth-state-change re-registration call below.
+  registerCurrentToken();
 
   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
     try {
@@ -64,6 +76,10 @@ void main() async {
     if (user == null) {
       runApp(const NguvuYaUpendoApp(isSignedIn: false, isActive: false));
     } else {
+      // Fire-and-forget: re-register the current FCM token now that we have
+      // a uid, so it gets attached to this user even if it was first
+      // fetched before sign-in. Doesn't block/delay runApp() below.
+      registerCurrentToken();
       try {
         final userDoc = await FirebaseFirestore.instance
             .collection('users')

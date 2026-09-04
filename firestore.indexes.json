@@ -7,6 +7,14 @@
         { "fieldPath": "isActive",            "order": "ASCENDING" },
         { "fieldPath": "subscriptionExpiry",  "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recipientId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt",   "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
