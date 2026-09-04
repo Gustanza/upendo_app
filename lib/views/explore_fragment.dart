@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/category_service.dart';
 import '../models/category_model.dart';
-import '../widgets/category_password_dialog.dart';
-import 'category_posts_screen.dart';
+import '../utils/category_navigation.dart';
+import '../widgets/category_grid_tile.dart';
 
 class ExploreFragment extends StatelessWidget {
   const ExploreFragment({super.key});
@@ -80,9 +80,24 @@ class ExploreFragment extends StatelessWidget {
 
               final categories = snapshot.data ?? [];
 
-              if (categories.isEmpty) {
+              // The main grid only ever shows top-level categories — a
+              // category that's someone else's child never appears here,
+              // it only shows up inside that parent's SubcategoriesScreen.
+              final topLevel =
+                  categories.where((c) => c.parentId == null).toList();
+
+              if (topLevel.isEmpty) {
                 return const Center(child: Text('No categories found.'));
               }
+
+              // Only used to decide, at tap time, which screen to push —
+              // SubcategoriesScreen subscribes to the live stream itself
+              // rather than being handed this snapshot's children, so it
+              // stays current after navigation (see subcategories_screen.dart).
+              final parentIdsWithChildren = categories
+                  .map((c) => c.parentId)
+                  .whereType<String>()
+                  .toSet();
 
               return GridView.builder(
                 padding: const EdgeInsets.all(20),
@@ -92,91 +107,15 @@ class ExploreFragment extends StatelessWidget {
                   mainAxisSpacing: 25,
                   childAspectRatio: 0.8,
                 ),
-                itemCount: categories.length,
+                itemCount: topLevel.length,
                 itemBuilder: (context, index) {
-                  final category = categories[index];
-
-                  return GestureDetector(
-                    onTap: () async {
-                      if (category.isProtected) {
-                        final unlocked = await showDialog<bool>(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (_) =>
-                              CategoryPasswordDialog(category: category),
-                        );
-                        if (unlocked != true) return;
-                      }
-                      if (!context.mounted) return;
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              CategoryPostsScreen(category: category),
-                        ),
-                      );
-                    },
-                    child: Column(
-                      children: [
-                        Stack(
-                          children: [
-                            Container(
-                              width: 90,
-                              height: 90,
-                              decoration: BoxDecoration(
-                                color: category.color,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.05),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 5),
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  category.icon,
-                                  color: Colors.white,
-                                  size: 45,
-                                ),
-                              ),
-                            ),
-                            if (category.isProtected)
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: Container(
-                                  width: 26,
-                                  height: 26,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: category.color,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    Icons.lock_rounded,
-                                    size: 13,
-                                    color: category.color,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          category.name,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
+                  final category = topLevel[index];
+                  return CategoryGridTile(
+                    category: category,
+                    onTap: () => openCategory(
+                      context,
+                      category,
+                      hasChildren: parentIdsWithChildren.contains(category.id),
                     ),
                   );
                 },

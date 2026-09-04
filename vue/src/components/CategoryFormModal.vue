@@ -43,6 +43,20 @@
           </div>
         </div>
 
+        <!-- Parent category -->
+        <div class="field">
+          <label>Parent category</label>
+          <select v-model="form.parentId" class="text-input" :disabled="editingHasChildren">
+            <option :value="null">None / Top-level</option>
+            <option v-for="opt in parentOptions" :key="opt.id" :value="opt.id">
+              {{ opt.name }}
+            </option>
+          </select>
+          <p v-if="editingHasChildren" class="field-hint">
+            This category already has sub-categories of its own, so it can't be nested under another category (one level of nesting only).
+          </p>
+        </div>
+
         <!-- Color -->
         <div class="field">
           <label>Color</label>
@@ -116,6 +130,9 @@
             Passwords don't match
           </span>
         </div>
+
+        <!-- Save error -->
+        <p v-if="saveError" class="save-error">{{ saveError }}</p>
       </div>
 
       <div class="modal-footer">
@@ -130,12 +147,16 @@
 
 <script setup>
 import { ref, computed, reactive } from 'vue'
-import { collection, addDoc, doc, updateDoc, serverTimestamp, deleteField } from 'firebase/firestore'
+import { collection, addDoc, doc, updateDoc, serverTimestamp, deleteField, query, where, limit, getDocs } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
 import { MATERIAL_ICONS, COLOR_OPTIONS, flutterColorToCss, iconChar } from '../utils/iconData.js'
 
 const props = defineProps({
-  category: { type: Object, default: null },
+  category:   { type: Object, default: null },
+  // The full category list, so this modal can build its own "parent
+  // category" options — kept in sync live by CategoriesView.vue's onSnapshot
+  // listener, so this always reflects the current nesting state.
+  categories: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -147,12 +168,30 @@ const form = reactive({
   iconCode:        props.category?.iconCode  ?? 0xe574,
   colorHex:        props.category?.colorHex  ?? 0xFF1565C0,
   isProtected:     props.category?.isProtected ?? false,
+  parentId:        props.category?.parentId  ?? null,
   password:        '',
   confirmPassword: '',
 })
 
+// Nesting is one level deep only, so a category that already has children
+// of its own can't also be assigned a parent (that would make its children
+// into grandchildren of whatever it got nested under).
+const editingHasChildren = computed(() =>
+  isEdit.value && props.categories.some(c => c.parentId === props.category.id)
+)
+
+// Candidates for "parent category": any top-level category other than the
+// one being edited. A candidate already having other children does NOT
+// disqualify it — that's the normal, expected shape of nesting (e.g. the
+// same parent needs to stay selectable while adding several children to it
+// one at a time).
+const parentOptions = computed(() =>
+  props.categories.filter(c => !c.parentId && c.id !== props.category?.id)
+)
+
 const iconSearch  = ref('')
 const saving      = ref(false)
+const saveError   = ref(null)
 const showPassword = ref(false)
 
 const filteredIcons = computed(() => {
@@ -179,14 +218,40 @@ async function sha256(message) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+// A fresh, single-purpose query (not reliant on the possibly-stale
+// `categories` prop) — used only right before writing, to shrink the race
+// window described below to one network round-trip.
+async function hasChildren(categoryId) {
+  const snap = await getDocs(
+    query(collection(db, 'categories'), where('parentId', '==', categoryId), limit(1))
+  )
+  return !snap.empty
+}
+
 async function save() {
   saving.value = true
+  saveError.value = null
   try {
+    // editingHasChildren locks the select to "None" in the UI, but it's
+    // computed from the `categories` prop, which can be stale by the time
+    // this fires (e.g. another admin added a child to this category after
+    // the modal opened but before this save). Re-check directly against
+    // Firestore right before writing, so a race can only slip a category
+    // into 2-level nesting during this one round-trip instead of however
+    // long the modal happened to be open.
+    const parentId = editingHasChildren.value ? null : (form.parentId || null)
+    if (isEdit.value && parentId && await hasChildren(props.category.id)) {
+      saveError.value =
+        "This category now has subcategories of its own and can't be nested under another category. Close and reopen the form to see the current state."
+      return
+    }
+
     const payload = {
       name:      form.name.trim(),
       iconCode:  form.iconCode,
       colorHex:  form.colorHex,
       isProtected: form.isProtected,
+      parentId,
       updatedAt: serverTimestamp(),
     }
 
@@ -286,6 +351,8 @@ async function save() {
   font-size: 12px;
   color: #dc2626;
 }
+
+.save-error { font-size: 13px; color: #c81e1e; background: #fde8e8; padding: 10px 14px; border-radius: 8px; }
 
 /* Toggle */
 .toggle-row {

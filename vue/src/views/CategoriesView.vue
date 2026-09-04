@@ -23,6 +23,7 @@
           <tr>
             <th>Icon</th>
             <th>Name</th>
+            <th>Parent</th>
             <th>Color</th>
             <th></th>
           </tr>
@@ -38,6 +39,7 @@
               {{ cat.name }}
               <span v-if="cat.isProtected" class="lock-badge mi" title="Password protected">lock</span>
             </td>
+            <td class="cat-parent">{{ parentName(cat) }}</td>
             <td>
               <span class="color-dot" :style="{ background: cssColor(cat.colorHex) }"></span>
             </td>
@@ -78,20 +80,35 @@
     <!-- Delete confirmation -->
     <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
       <div class="confirm-modal">
-        <h3>Delete "{{ deleteTarget.name }}"?</h3>
-        <p>This will remove the category. Posts linked to it will keep their category ID but the category won't exist anymore.</p>
-        <div class="confirm-actions">
-          <button class="btn-cancel" @click="deleteTarget = null">Cancel</button>
-          <button class="btn-confirm-delete" :disabled="deleting" @click="doDelete">
-            {{ deleting ? 'Deleting…' : 'Delete' }}
-          </button>
-        </div>
+        <template v-if="deleteTargetChildren.length">
+          <h3>Can't delete "{{ deleteTarget.name }}"</h3>
+          <p>
+            This category has {{ deleteTargetChildren.length }}
+            subcategor{{ deleteTargetChildren.length === 1 ? 'y' : 'ies' }}
+            ({{ deleteTargetChildren.map(c => c.name).join(', ') }}).
+            Delete or reassign them first.
+          </p>
+          <div class="confirm-actions">
+            <button class="btn-cancel" @click="deleteTarget = null">Close</button>
+          </div>
+        </template>
+        <template v-else>
+          <h3>Delete "{{ deleteTarget.name }}"?</h3>
+          <p>This will remove the category. Posts linked to it will keep their category ID but the category won't exist anymore.</p>
+          <div class="confirm-actions">
+            <button class="btn-cancel" @click="deleteTarget = null">Cancel</button>
+            <button class="btn-confirm-delete" :disabled="deleting" @click="doDelete">
+              {{ deleting ? 'Deleting…' : 'Delete' }}
+            </button>
+          </div>
+        </template>
       </div>
     </div>
 
     <CategoryFormModal
       v-if="showModal"
       :category="editingCategory"
+      :categories="categories"
       @close="showModal = false"
       @saved="onSaved"
     />
@@ -144,6 +161,23 @@ onUnmounted(() => unsub?.())
 
 function cssColor(hex) { return flutterColorToCss(hex) }
 
+function parentName(cat) {
+  if (!cat.parentId) return '—'
+  const parent = categories.value.find(c => c.id === cat.parentId)
+  return parent ? parent.name : '—'
+}
+
+function childrenOf(cat) {
+  return categories.value.filter(c => c.parentId === cat.id)
+}
+
+// Live off the same onSnapshot-synced `categories` list the table renders
+// from, so this re-evaluates itself if a child is added/removed while the
+// confirm dialog is open.
+const deleteTargetChildren = computed(() =>
+  deleteTarget.value ? childrenOf(deleteTarget.value) : []
+)
+
 function openCreate() {
   editingCategory.value = null
   showModal.value = true
@@ -158,6 +192,11 @@ function confirmDelete(cat) { deleteTarget.value = cat }
 
 async function doDelete() {
   if (!deleteTarget.value) return
+  // Re-check right before deleting (not just when the dialog opened) — the
+  // template already hides this button once deleteTargetChildren is
+  // non-empty, but that's reactive to the same onSnapshot list this reads,
+  // so this is a cheap belt-and-suspenders guard rather than a new read.
+  if (childrenOf(deleteTarget.value).length > 0) return
   deleting.value = true
   try {
     await deleteDoc(doc(db, 'categories', deleteTarget.value.id))
@@ -271,6 +310,11 @@ function onSaved() {
 
 .lock-badge {
   font-size: 16px;
+  color: #6b7280;
+}
+
+.cat-parent {
+  font-size: 13px;
   color: #6b7280;
 }
 

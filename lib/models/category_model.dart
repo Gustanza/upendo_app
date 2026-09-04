@@ -7,6 +7,10 @@ class Category {
   final int colorHex;
   final bool isProtected;
   final String? passwordHash;
+  // null/absent = top-level category. One level of nesting only — a
+  // category referenced as someone's parentId is never itself expected to
+  // have a parentId (enforced by the admin form, not by this model).
+  final String? parentId;
 
   Category({
     required this.id,
@@ -15,6 +19,7 @@ class Category {
     this.colorHex = 0xFF1565C0, // blue[800]
     this.isProtected = false,
     this.passwordHash,
+    this.parentId,
   });
 
   factory Category.fromFirestore(String id, Map<String, dynamic> data) {
@@ -25,6 +30,7 @@ class Category {
       colorHex: data['colorHex'] ?? 0xFF1565C0,
       isProtected: data['isProtected'] ?? false,
       passwordHash: data['passwordHash'],
+      parentId: data['parentId'] as String?,
     );
   }
 
@@ -35,6 +41,7 @@ class Category {
       'colorHex': colorHex,
       'isProtected': isProtected,
       if (passwordHash != null) 'passwordHash': passwordHash,
+      if (parentId != null) 'parentId': parentId,
     };
   }
 
