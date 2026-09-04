@@ -73,8 +73,14 @@ service cloud.firestore {
     // conversation already exist" is a doc-get, and the create rule below
     // can verify a client isn't fabricating an arbitrary conversation doc.
     match /conversations/{conversationId} {
+      // resource == null when the doc doesn't exist yet — required so
+      // ConversationService.getOrCreateConversation's existence check
+      // (get() before create()) gets a clean "not found" instead of
+      // permission-denied on every first-time conversation (resource.data
+      // can't be evaluated on a null resource, so without this branch the
+      // participant check itself throws before create() ever runs).
       allow read: if request.auth != null
-        && request.auth.uid in resource.data.participants;
+        && (resource == null || request.auth.uid in resource.data.participants);
 
       allow create: if request.auth != null
         && request.resource.data.participants is list
