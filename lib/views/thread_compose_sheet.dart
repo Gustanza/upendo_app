@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../models/poll_model.dart';
 import '../services/thread_post_service.dart';
+import '../widgets/poll_composer_card.dart';
 
 class ThreadComposeSheet extends StatefulWidget {
   const ThreadComposeSheet({super.key});
@@ -14,6 +16,7 @@ class _ThreadComposeSheetState extends State<ThreadComposeSheet> {
   final ThreadPostService _postService = ThreadPostService();
   final TextEditingController _textController = TextEditingController();
   XFile? _image;
+  PollDraft? _pollDraft;
   bool _isPosting = false;
 
   @override
@@ -33,10 +36,28 @@ class _ThreadComposeSheetState extends State<ThreadComposeSheet> {
 
   Future<void> _submit() async {
     final text = _textController.text.trim();
-    if (text.isEmpty && _image == null) return;
+    if (text.isEmpty && _image == null && _pollDraft == null) return;
+
+    String postText = text;
+    PollData? pollData;
+    if (_pollDraft != null) {
+      pollData = _pollDraft!.build();
+      if (pollData == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Jaza swali la kura kikamilifu')),
+        );
+        return;
+      }
+      postText = pollData.question;
+    }
+
     setState(() => _isPosting = true);
     try {
-      await _postService.createPost(text: text, image: _image);
+      await _postService.createPost(
+        text: postText,
+        image: _image,
+        poll: pollData,
+      );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
@@ -73,17 +94,26 @@ class _ThreadComposeSheetState extends State<ThreadComposeSheet> {
               ),
             ],
           ),
-          TextField(
-            controller: _textController,
-            maxLines: 5,
-            minLines: 3,
-            maxLength: 500,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Unafikiria nini?',
-              border: InputBorder.none,
+          if (_pollDraft == null)
+            TextField(
+              controller: _textController,
+              maxLines: 5,
+              minLines: 3,
+              maxLength: 500,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Unafikiria nini?',
+                border: InputBorder.none,
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: PollComposerCard(
+                draft: _pollDraft!,
+                onChanged: () => setState(() {}),
+              ),
             ),
-          ),
           if (_image != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -118,6 +148,20 @@ class _ThreadComposeSheetState extends State<ThreadComposeSheet> {
               IconButton(
                 onPressed: _isPosting ? null : _pickImage,
                 icon: const Icon(Icons.image_outlined, color: Color(0xFF0077C2)),
+              ),
+              IconButton(
+                onPressed: _isPosting
+                    ? null
+                    : () => setState(
+                          () => _pollDraft = _pollDraft == null ? PollDraft() : null,
+                        ),
+                icon: Icon(
+                  Icons.poll_outlined,
+                  color: _pollDraft == null ? const Color(0xFF0077C2) : Colors.white,
+                ),
+                style: _pollDraft == null
+                    ? null
+                    : IconButton.styleFrom(backgroundColor: const Color(0xFF0077C2)),
               ),
               const Spacer(),
               ElevatedButton(

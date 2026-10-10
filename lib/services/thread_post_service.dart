@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import '../models/poll_model.dart';
 import '../models/thread_post_model.dart';
 
 class ThreadPostService {
@@ -38,7 +39,7 @@ class ThreadPostService {
   // Creates the doc first (so we have an id to scope the Storage path to),
   // then uploads the image and attaches its URL — keeps orphaned uploads
   // impossible to reference even if the upload step fails.
-  Future<void> createPost({required String text, XFile? image}) async {
+  Future<void> createPost({required String text, XFile? image, PollData? poll}) async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final userDoc = await _db.collection('users').doc(uid).get();
     final authorName = (userDoc.data()?['fullName'] as String?) ?? 'Mtumiaji';
@@ -49,6 +50,9 @@ class ThreadPostService {
       'text': text.trim(),
       'imageUrl': null,
       'createdAt': FieldValue.serverTimestamp(),
+      'type': poll != null ? PollType.hostType : 'text',
+      'pollType': poll?.pollType,
+      'pollOptions': poll?.options,
     });
 
     if (image != null) {

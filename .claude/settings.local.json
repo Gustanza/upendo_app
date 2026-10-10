@@ -25,7 +25,9 @@
       "Bash(node -e \"require\\('./search/searchPosts.js'\\)\")",
       "Bash(node -e \"require\\('./interactions/counters.js'\\); console.log\\('counters.js OK - exports:', Object.keys\\(require\\('./interactions/counters.js'\\)\\)\\)\")",
       "Bash(command -v node)",
-      "Bash(find / -maxdepth 4 -iname \"node\" -type f)"
+      "Bash(find / -maxdepth 4 -iname \"node\" -type f)",
+      "Bash(node -c payments/clickpesa.js)",
+      "Bash(node -c index.js)"
     ]
   }
 }

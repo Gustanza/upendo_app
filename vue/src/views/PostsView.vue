@@ -142,6 +142,7 @@ const typeFilters = [
   { label: 'Video', value: 'video' },
   { label: 'Audio', value: 'audio' },
   { label: 'PDF',   value: 'pdf' },
+  { label: 'Poll',  value: 'poll' },
 ]
 
 function buildQuery(cursor) {
@@ -268,6 +269,7 @@ loadPage()
 .type-badge.video { background: #e8f0fe; color: #1a56db; }
 .type-badge.audio { background: #f3e8ff; color: #7c3aed; }
 .type-badge.pdf   { background: #fde8e8; color: #c81e1e; }
+.type-badge.poll  { background: #fef3c7; color: #b45309; }
 
 .dot { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 500; }
 .dot::before { content: ''; width: 7px; height: 7px; border-radius: 50%; display: inline-block; }

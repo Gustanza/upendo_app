@@ -37,7 +37,10 @@
 
           <!-- Title -->
           <div class="field">
-            <label class="label" for="f-title">Title <span class="req">*</span></label>
+            <label class="label" for="f-title">
+              Title <span class="req">*</span>
+              <span v-if="isPoll" class="label-hint">Hii ndiyo swali lako</span>
+            </label>
             <input id="f-title" v-model="form.title" class="input" type="text" placeholder="e.g. Changamot za Kimaisha" required />
           </div>
 
@@ -58,7 +61,7 @@
             <label class="label">Category</label>
             <div v-if="categoriesLoading" class="cat-loading">Loading categories…</div>
             <div v-else class="cat-dropdown" v-click-outside="() => catOpen = false">
-              <button type="button" class="cat-trigger" @click="catOpen = !catOpen">
+              <button type="button" class="cat-trigger" @click="toggleCatMenu">
                 <template v-if="selectedCategory">
                   <span class="cat-trigger-icon" :style="{ background: catCssColor(selectedCategory.colorHex) }">
                     <span class="mi">{{ catIconChar(selectedCategory.iconCode) }}</span>
@@ -74,32 +77,51 @@
               </button>
 
               <div v-if="catOpen" class="cat-menu">
-                <button type="button" class="cat-option" :class="{ active: form.category_id === '' }" @click="selectCat(null)">
-                  <span class="cat-option-icon-none">—</span>
-                  <span class="cat-option-name">None</span>
-                </button>
-                <button
-                  v-for="cat in categories"
-                  :key="cat.id"
-                  type="button"
-                  class="cat-option"
-                  :class="{ active: form.category_id === cat.id }"
-                  @click="selectCat(cat)"
-                >
-                  <span class="cat-option-icon" :style="{ background: catCssColor(cat.colorHex) }">
-                    <span class="mi">{{ catIconChar(cat.iconCode) }}</span>
-                  </span>
-                  <span class="cat-option-name">{{ cat.name }}</span>
-                  <svg v-if="form.category_id === cat.id" class="cat-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <polyline points="20 6 9 17 4 12"/>
+                <div class="cat-search-wrap">
+                  <svg class="cat-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                   </svg>
-                </button>
+                  <input
+                    ref="catSearchInput"
+                    v-model="catSearch"
+                    type="text"
+                    class="cat-search-input"
+                    placeholder="Search categories…"
+                    @keydown.esc="catOpen = false"
+                  />
+                </div>
+
+                <div class="cat-option-list">
+                  <button v-if="showNoneOption" type="button" class="cat-option" :class="{ active: form.category_id === '' }" @click="selectCat(null)">
+                    <span class="cat-option-icon-none">—</span>
+                    <span class="cat-option-name">None</span>
+                  </button>
+                  <button
+                    v-for="cat in filteredCategories"
+                    :key="cat.id"
+                    type="button"
+                    class="cat-option"
+                    :class="{ active: form.category_id === cat.id }"
+                    @click="selectCat(cat)"
+                  >
+                    <span class="cat-option-icon" :style="{ background: catCssColor(cat.colorHex) }">
+                      <span class="mi">{{ catIconChar(cat.iconCode) }}</span>
+                    </span>
+                    <span class="cat-option-name">{{ cat.name }}</span>
+                    <svg v-if="form.category_id === cat.id" class="cat-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </button>
+                  <p v-if="!showNoneOption && filteredCategories.length === 0" class="cat-no-results">
+                    No categories match "{{ catSearch }}"
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Thumbnail upload -->
-          <div class="field">
+          <div class="field" v-if="!isPoll">
             <label class="label">
               Thumbnail
               <span class="label-hint">Image shown in lists and cards</span>
@@ -115,7 +137,7 @@
           </div>
 
           <!-- File upload -->
-          <div class="field">
+          <div class="field" v-if="!isPoll">
             <label class="label">
               {{ fileLabel }} <span class="req">*</span>
               <span class="label-hint">{{ fileHint }}</span>
@@ -129,6 +151,59 @@
               :current-url="form.file_url"
               @uploaded="form.file_url = $event"
             />
+          </div>
+
+          <!-- Poll fields -->
+          <div class="field" v-if="isPoll">
+            <label class="label">Poll type</label>
+            <div class="type-tabs">
+              <button
+                type="button"
+                class="type-tab"
+                :class="{ active: form.pollType === 'multiple_choice' }"
+                @click="form.pollType = 'multiple_choice'"
+              >
+                Chaguo Nyingi
+              </button>
+              <button
+                type="button"
+                class="type-tab"
+                :class="{ active: form.pollType === 'open_text' }"
+                @click="form.pollType = 'open_text'"
+              >
+                Jibu la Maandishi
+              </button>
+            </div>
+          </div>
+
+          <div class="field" v-if="isPoll && form.pollType === 'multiple_choice'">
+            <label class="label">
+              Options
+              <span class="label-hint">2–6 choices</span>
+            </label>
+            <div class="poll-options">
+              <div v-for="(option, index) in form.pollOptions" :key="index" class="poll-option-row">
+                <input
+                  v-model="form.pollOptions[index]"
+                  class="input"
+                  type="text"
+                  :placeholder="`Chaguo ${index + 1}`"
+                  required
+                />
+                <button
+                  type="button"
+                  class="poll-option-remove"
+                  :disabled="form.pollOptions.length <= 2"
+                  @click="removePollOption(index)"
+                >×</button>
+              </div>
+            </div>
+            <button
+              v-if="form.pollOptions.length < 6"
+              type="button"
+              class="btn-ghost poll-add-option"
+              @click="form.pollOptions.push('')"
+            >+ Ongeza chaguo</button>
           </div>
 
           <!-- Toggles -->
@@ -162,7 +237,7 @@
           <!-- Footer -->
           <div class="drawer-footer">
             <button type="button" class="btn-ghost" @click="$emit('close')" :disabled="saving">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="saving || !form.file_url">
+            <button type="submit" class="btn-primary" :disabled="saving || (!isPoll && !form.file_url)">
               <span v-if="saving" class="btn-spinner"></span>
               {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create post' }}
             </button>
@@ -175,7 +250,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue'
 import { collection, addDoc, doc, updateDoc, getDocs, serverTimestamp } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
 import { flutterColorToCss, iconChar } from '../utils/iconData.js'
@@ -202,10 +277,35 @@ const isEdit = computed(() => !!props.post)
 const categories        = ref([])
 const categoriesLoading = ref(true)
 const catOpen           = ref(false)
+const catSearch         = ref('')
+const catSearchInput    = ref(null)
 
 const selectedCategory = computed(() =>
   categories.value.find(c => c.id === form.category_id) ?? null
 )
+
+const filteredCategories = computed(() => {
+  const q = catSearch.value.trim().toLowerCase()
+  if (!q) return categories.value
+  return categories.value.filter(c => c.name.toLowerCase().includes(q))
+})
+
+// "None" only makes sense to show while it'd actually match what's typed —
+// otherwise a search for "chishtiyya" would still show an unrelated "None"
+// row above the (possibly empty) filtered results.
+const showNoneOption = computed(() => {
+  const q = catSearch.value.trim().toLowerCase()
+  return !q || 'none'.includes(q)
+})
+
+async function toggleCatMenu() {
+  catOpen.value = !catOpen.value
+  if (catOpen.value) {
+    catSearch.value = ''
+    await nextTick()
+    catSearchInput.value?.focus()
+  }
+}
 
 function selectCat(cat) {
   form.category_id = cat ? cat.id : ''
@@ -227,13 +327,20 @@ const types = [
   { label: 'Video', value: 'video', icon: '🎬' },
   { label: 'Audio', value: 'audio', icon: '🎵' },
   { label: 'PDF',   value: 'pdf',   icon: '📄' },
+  { label: 'Poll',  value: 'poll',  icon: '📊' },
 ]
 
 const form = reactive({
   title: '', subtitle: '', description: '',
   type: 'video', thumbnail: '', file_url: '',
   category_id: '', featured: false, hot: false,
+  pollType: 'multiple_choice', pollOptions: ['', ''],
 })
+
+// Single source of truth for the "is this a poll" branch used throughout the
+// template and save() — avoids re-typing (and risking a typo in) the
+// `form.type === 'poll'` literal in several places.
+const isPoll = computed(() => form.type === 'poll')
 
 watch(() => props.post, (p) => {
   if (p) {
@@ -247,6 +354,8 @@ watch(() => props.post, (p) => {
       category_id: p.category_id ?? '',
       featured:    p.featured    ?? false,
       hot:         p.hot         ?? false,
+      pollType:    p.pollType    ?? 'multiple_choice',
+      pollOptions: p.pollOptions?.length ? [...p.pollOptions] : ['', ''],
     })
   }
 }, { immediate: true })
@@ -274,20 +383,46 @@ const fileStoragePath = computed(() => `posts/${form.type}s`)
 const saving    = ref(false)
 const saveError = ref(null)
 
+function removePollOption(index) {
+  if (form.pollOptions.length <= 2) return
+  form.pollOptions.splice(index, 1)
+}
+
 async function save() {
-  saving.value    = true
   saveError.value = null
+
+  const isPollMultipleChoice = isPoll.value && form.pollType === 'multiple_choice'
+  const cleanedPollOptions = isPollMultipleChoice
+    ? [...new Set(form.pollOptions.map(o => o.trim()).filter(o => o !== ''))]
+    : []
+
+  // Whitespace-only entries pass the inputs' native `required` check but are
+  // stripped here, and duplicate options collapse via the Set above — both
+  // can silently take a validated "2+ options" form below the minimum the
+  // poll needs to be usable. Catch that before writing instead of persisting
+  // a multiple-choice poll with too few choices to vote on.
+  if (isPollMultipleChoice && cleanedPollOptions.length < 2) {
+    saveError.value = 'Poll options must have at least 2 different, non-empty choices.'
+    return
+  }
+
+  saving.value = true
 
   const payload = {
     title:       form.title.trim(),
     subtitle:    form.subtitle.trim(),
     description: form.description.trim(),
     type:        form.type,
-    thumbnail:   form.thumbnail,
-    file_url:    form.file_url,
+    // Polls don't use thumbnail/file uploads (those fields are hidden for
+    // them) — clear any values carried over from a previous non-poll type
+    // so converting a post to a poll doesn't leave stale media behind.
+    thumbnail:   isPoll.value ? '' : form.thumbnail,
+    file_url:    isPoll.value ? '' : form.file_url,
     category_id: form.category_id.trim(),
     featured:    form.featured,
     hot:         form.hot,
+    pollType:    isPoll.value ? form.pollType : null,
+    pollOptions: cleanedPollOptions,
   }
 
   try {
@@ -380,6 +515,19 @@ async function save() {
 .type-tab.active { border-color: #3b4cca; background: #eef0fd; color: #3b4cca; }
 .type-tab-icon { font-size: 20px; }
 
+.poll-options { display: flex; flex-direction: column; gap: 8px; }
+.poll-option-row { display: flex; align-items: center; gap: 8px; }
+.poll-option-row .input { flex: 1; }
+.poll-option-remove {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
+  border: 1.5px solid #dde0ee; background: #fafbff; color: #6b7280;
+  font-size: 16px; line-height: 1; cursor: pointer; transition: all 0.15s;
+}
+.poll-option-remove:hover:not(:disabled) { border-color: #e53e3e; color: #e53e3e; background: #fde8e8; }
+.poll-option-remove:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.poll-add-option { margin-top: 8px; align-self: flex-start; padding: 7px 14px; font-size: 13px; }
+
 .toggles-row {
   display: flex; flex-direction: column; gap: 14px;
   padding: 16px; background: #f8f9fc; border-radius: 10px; border: 1px solid #e8eaf0;
@@ -469,8 +617,36 @@ async function save() {
   box-shadow: 0 8px 24px rgba(0,0,0,0.12);
   z-index: 200;
   overflow: hidden;
-  max-height: 240px;
-  overflow-y: auto;
+}
+
+.cat-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef0f8;
+}
+.cat-search-icon { width: 15px; height: 15px; color: #9ca3af; flex-shrink: 0; }
+.cat-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1a1d2e;
+  background: transparent;
+}
+.cat-search-input::placeholder { color: #b0b4c4; }
+
+.cat-option-list { max-height: 220px; overflow-y: auto; }
+
+.cat-no-results {
+  padding: 16px 12px;
+  font-size: 13px;
+  color: #9ca3af;
+  text-align: center;
+  margin: 0;
 }
 
 .cat-option {

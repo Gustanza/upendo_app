@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../models/post_model.dart';
 import '../models/comment_model.dart';
+import '../models/poll_model.dart';
 import '../services/user_preferences.dart';
 import '../services/post_interaction_service.dart';
+import '../widgets/poll_view.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostModel post;
@@ -95,6 +98,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   Widget build(BuildContext context) {
     bool isPdf = widget.post.type == 'pdf';
+    bool isPoll = widget.post.type == PollType.hostType;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -108,13 +112,33 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [_buildMediaPlayer(), _buildContent()],
+                  children: [
+                    if (isPoll) _buildPollSection() else _buildMediaPlayer(),
+                    _buildContent(),
+                  ],
                 ),
               ),
             ),
             _buildBottomSection(),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildPollSection() {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: PollView(
+        poll: PollData.fromHostFields(
+          question: widget.post.title,
+          pollType: widget.post.pollType,
+          options: widget.post.pollOptions,
+        ),
+        responsesRef: FirebaseFirestore.instance
+            .collection('posts')
+            .doc(widget.post.id)
+            .collection('pollResponses'),
       ),
     );
   }
@@ -300,7 +324,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),

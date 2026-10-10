@@ -10,6 +10,9 @@ class ThreadPostModel {
   // Maintained server-side only by Cloud Functions — never written by client.
   final int likeCount;
   final int commentCount;
+  final String type;
+  final String? pollType;
+  final List<String>? pollOptions;
 
   ThreadPostModel({
     required this.id,
@@ -20,6 +23,9 @@ class ThreadPostModel {
     this.createdAt,
     this.likeCount = 0,
     this.commentCount = 0,
+    this.type = 'text',
+    this.pollType,
+    this.pollOptions,
   });
 
   factory ThreadPostModel.fromFirestore(DocumentSnapshot doc) {
@@ -33,6 +39,11 @@ class ThreadPostModel {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       likeCount: data['likeCount'] ?? 0,
       commentCount: data['commentCount'] ?? 0,
+      type: data['type'] ?? 'text',
+      pollType: data['pollType'] as String?,
+      pollOptions: data['pollOptions'] is List
+          ? (data['pollOptions'] as List).map((e) => e.toString()).toList()
+          : null,
     );
   }
 }

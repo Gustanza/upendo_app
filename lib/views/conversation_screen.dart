@@ -1,8 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/message_model.dart';
+import '../models/poll_model.dart';
 import '../services/conversation_service.dart';
 import '../utils/time_ago.dart';
+import '../widgets/poll_composer_card.dart';
+import '../widgets/poll_view.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String conversationId;
@@ -23,6 +27,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final TextEditingController _messageController = TextEditingController();
   late final Stream<List<MessageModel>> _messagesStream;
   bool _isSending = false;
+  PollDraft? _pollDraft;
 
   @override
   void initState() {
@@ -41,14 +46,30 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Future<void> _sendMessage() async {
-    final text = _messageController.text.trim();
+    PollData? pollData;
+    String text;
+    if (_pollDraft != null) {
+      pollData = _pollDraft!.build();
+      if (pollData == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Jaza swali la kura kikamilifu')),
+        );
+        return;
+      }
+      text = pollData.question;
+    } else {
+      text = _messageController.text.trim();
+    }
     if (text.isEmpty || _isSending) return;
     setState(() => _isSending = true);
     try {
-      await _service.sendMessage(widget.conversationId, text);
+      await _service.sendMessage(widget.conversationId, text, poll: pollData);
       if (mounted) {
         _messageController.clear();
-        setState(() => _isSending = false);
+        setState(() {
+          _isSending = false;
+          _pollDraft = null;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -132,14 +153,29 @@ class _ConversationScreenState extends State<ConversationScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              message.text,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.3,
-                color: isMe ? Colors.white : const Color(0xFF1A1D2E),
+            if (message.type == PollType.hostType)
+              PollView(
+                poll: PollData.fromHostFields(
+                  question: message.text,
+                  pollType: message.pollType,
+                  options: message.pollOptions,
+                ),
+                responsesRef: FirebaseFirestore.instance
+                    .collection('conversations')
+                    .doc(widget.conversationId)
+                    .collection('messages')
+                    .doc(message.id)
+                    .collection('pollResponses'),
+              )
+            else
+              Text(
+                message.text,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.3,
+                  color: isMe ? Colors.white : const Color(0xFF1A1D2E),
+                ),
               ),
-            ),
             const SizedBox(height: 4),
             Text(
               timeAgo(message.createdAt),
@@ -163,50 +199,80 @@ class _ConversationScreenState extends State<ConversationScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
           ],
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: TextField(
-                controller: _messageController,
-                // Matches the 500-char cap firestore.rules enforces server-side
-                // (see /conversations/{id}/messages/{id} allow create) — without
-                // this, a too-long message would fail silently-ish at the rules
-                // layer instead of being prevented up front. counterText hides
-                // the default "n/500" counter to keep this compact pill input's
-                // layout unchanged.
-                maxLength: 500,
-                decoration: InputDecoration(
-                  hintText: 'Andika ujumbe...',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  counterText: '',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            if (_pollDraft != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: PollComposerCard(
+                  draft: _pollDraft!,
+                  onChanged: () => setState(() {}),
                 ),
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _sendMessage(),
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: _isSending
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.send, color: Color(0xFF0077C2)),
-              onPressed: _isSending ? null : _sendMessage,
+            Row(
+              children: [
+                IconButton(
+                  onPressed: _isSending
+                      ? null
+                      : () => setState(
+                            () => _pollDraft = _pollDraft == null ? PollDraft() : null,
+                          ),
+                  icon: Icon(
+                    Icons.poll_outlined,
+                    color: _pollDraft == null ? const Color(0xFF0077C2) : Colors.white,
+                  ),
+                  style: _pollDraft == null
+                      ? null
+                      : IconButton.styleFrom(backgroundColor: const Color(0xFF0077C2)),
+                ),
+                if (_pollDraft == null)
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      // Matches the 500-char cap firestore.rules enforces server-side
+                      // (see /conversations/{id}/messages/{id} allow create) — without
+                      // this, a too-long message would fail silently-ish at the rules
+                      // layer instead of being prevented up front. counterText hides
+                      // the default "n/500" counter to keep this compact pill input's
+                      // layout unchanged.
+                      maxLength: 500,
+                      decoration: InputDecoration(
+                        hintText: 'Andika ujumbe...',
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        counterText: '',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
+                  )
+                else
+                  const Spacer(),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: _isSending
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send, color: Color(0xFF0077C2)),
+                  onPressed: _isSending ? null : _sendMessage,
+                ),
+              ],
             ),
           ],
         ),

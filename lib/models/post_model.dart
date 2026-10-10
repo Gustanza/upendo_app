@@ -15,6 +15,8 @@ class PostModel {
   // deliberately excluded from toFirestore().
   final int likeCount;
   final int commentCount;
+  final String? pollType;
+  final List<String>? pollOptions;
 
   PostModel({
     required this.id,
@@ -29,6 +31,8 @@ class PostModel {
     required this.categoryId,
     this.likeCount = 0,
     this.commentCount = 0,
+    this.pollType,
+    this.pollOptions,
   });
 
   factory PostModel.fromFirestore(DocumentSnapshot doc) {
@@ -50,6 +54,10 @@ class PostModel {
       categoryId: data['category_id'] ?? '',
       likeCount: data['likeCount'] ?? 0,
       commentCount: data['commentCount'] ?? 0,
+      pollType: data['pollType'] as String?,
+      pollOptions: data['pollOptions'] is List
+          ? (data['pollOptions'] as List).map((e) => e.toString()).toList()
+          : null,
     );
   }
 
@@ -64,6 +72,8 @@ class PostModel {
       'featured': featured,
       'hot': hot,
       'category_id': categoryId,
+      'pollType': pollType,
+      'pollOptions': pollOptions,
     };
   }
 }

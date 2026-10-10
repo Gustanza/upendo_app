@@ -67,7 +67,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
 
-    if (n.type == 'reply' || n.type == 'threadLike') {
+    if (n.type == 'reply' || n.type == 'threadLike' || n.type == 'threadPost') {
       if (n.postId == null) return;
       await _openFetchedPost<ThreadPostModel>(
         () => ThreadPostService().getPostById(n.postId!),

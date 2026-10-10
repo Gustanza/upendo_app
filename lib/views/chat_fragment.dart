@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/poll_model.dart';
 import '../models/thread_post_model.dart';
 import '../services/thread_post_service.dart';
 import '../utils/time_ago.dart';
+import '../widgets/poll_view.dart';
 import '../widgets/thread_stats_row.dart';
 import 'thread_compose_sheet.dart';
 import 'thread_detail_screen.dart';
@@ -286,7 +288,20 @@ class _ChatFragmentState extends State<ChatFragment> {
                   ),
               ],
             ),
-            if (post.text.isNotEmpty) ...[
+            if (post.type == PollType.hostType) ...[
+              const SizedBox(height: 10),
+              PollView(
+                poll: PollData.fromHostFields(
+                  question: post.text,
+                  pollType: post.pollType,
+                  options: post.pollOptions,
+                ),
+                responsesRef: FirebaseFirestore.instance
+                    .collection('threadPosts')
+                    .doc(post.id)
+                    .collection('pollResponses'),
+              ),
+            ] else if (post.text.isNotEmpty) ...[
               const SizedBox(height: 10),
               Text(
                 post.text,

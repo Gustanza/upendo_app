@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/category_model.dart';
+import '../models/poll_model.dart';
 import '../models/post_model.dart';
 import '../services/post_service.dart';
 import '../widgets/post_stats_row.dart';
@@ -84,7 +85,7 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            widget.category.color.withOpacity(0.8),
+            widget.category.color.withValues(alpha: 0.8),
             widget.category.color,
           ],
         ),
@@ -175,7 +176,7 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 5),
               ),
@@ -203,8 +204,10 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                               width: 100,
                               height: 100,
                               color: Colors.grey[200],
-                              child: const Icon(
-                                Icons.image,
+                              child: Icon(
+                                post.type == PollType.hostType
+                                    ? Icons.bar_chart_rounded
+                                    : Icons.image,
                                 color: Colors.grey,
                               ),
                             ),
@@ -220,7 +223,7 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: widget.category.color.withOpacity(0.1),
+                              color: widget.category.color.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(

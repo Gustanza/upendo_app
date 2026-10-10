@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/conversation_model.dart';
 import '../models/message_model.dart';
+import '../models/poll_model.dart';
 
 class ConversationService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -88,7 +89,7 @@ class ConversationService {
         });
   }
 
-  Future<void> sendMessage(String conversationId, String text) async {
+  Future<void> sendMessage(String conversationId, String text, {PollData? poll}) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
     final uid = FirebaseAuth.instance.currentUser!.uid;
@@ -96,6 +97,9 @@ class ConversationService {
       'senderId': uid,
       'text': trimmed,
       'createdAt': FieldValue.serverTimestamp(),
+      'type': poll != null ? PollType.hostType : 'text',
+      'pollType': poll?.pollType,
+      'pollOptions': poll?.options,
     });
   }
 }

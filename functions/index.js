@@ -10,6 +10,7 @@ setGlobalOptions({ maxInstances: 10 });
 
 const { subscribe }                      = require('./payments/index');
 const { resolvePayment }                 = require('./payments/ipnresolver');
+const { subscribeClickPesa, resolvePaymentClickPesa } = require('./payments/clickpesa');
 const { deactivateExpiredSubscriptions } = require('./subscriptions/deactivate');
 const { searchPosts }                    = require('./search/searchPosts');
 const {
@@ -22,6 +23,7 @@ const { cleanupThreadPost }              = require('./interactions/cleanupThread
 const {
   notifyPostComment,
   notifyPostLike,
+  notifyThreadPostCreated,
   notifyThreadReply,
   notifyThreadLike,
 }                                         = require('./interactions/activityNotifications');
@@ -29,6 +31,8 @@ const { notifyConversationMessage }      = require('./interactions/messageNotifi
 
 exports.subscribe                      = subscribe;
 exports.resolvePayment                 = resolvePayment;
+exports.subscribeClickPesa             = subscribeClickPesa;
+exports.resolvePaymentClickPesa        = resolvePaymentClickPesa;
 exports.deactivateExpiredSubscriptions = deactivateExpiredSubscriptions;
 exports.searchPosts                    = searchPosts;
 exports.updateCommentCount             = updateCommentCount;
@@ -38,6 +42,7 @@ exports.updateThreadLikeCount          = updateThreadLikeCount;
 exports.cleanupThreadPost              = cleanupThreadPost;
 exports.notifyPostComment              = notifyPostComment;
 exports.notifyPostLike                 = notifyPostLike;
+exports.notifyThreadPostCreated        = notifyThreadPostCreated;
 exports.notifyThreadReply              = notifyThreadReply;
 exports.notifyThreadLike               = notifyThreadLike;
 exports.notifyConversationMessage      = notifyConversationMessage;

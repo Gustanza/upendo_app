@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,16 +10,19 @@ import 'package:upendo_app/views/chat_fragment.dart';
 import 'package:upendo_app/views/conversations_screen.dart';
 import 'package:upendo_app/views/post_detail_screen.dart';
 import 'package:upendo_app/views/account_fragment.dart';
-import 'package:upendo_app/views/post_search_delegate.dart';
+import 'package:upendo_app/views/category_search_delegate.dart';
 import 'package:upendo_app/views/saved_fragment.dart';
 import 'package:upendo_app/views/notifications_screen.dart';
 import '../models/post_model.dart';
 import '../models/notification_model.dart';
 import '../models/conversation_model.dart';
+import '../models/category_model.dart';
 import '../services/post_service.dart';
+import '../services/category_service.dart';
 import '../services/user_preferences.dart';
 import '../services/notification_service.dart';
 import '../services/conversation_service.dart';
+import '../utils/category_navigation.dart';
 import '../widgets/post_stats_row.dart';
 
 class HomeDashboard extends StatefulWidget {
@@ -32,12 +35,11 @@ class HomeDashboard extends StatefulWidget {
 class _HomeDashboardState extends State<HomeDashboard> {
   int _currentIndex = 2;
   final PostService _postService = PostService();
+  final CategoryService _categoryService = CategoryService();
 
-  final List<PostModel> _featuredPosts = [];
-  DocumentSnapshot? _lastFeaturedDoc;
-  bool _isLoadingFeatured = false;
-  bool _hasMoreFeatured = true;
-  int _currentFeaturedPage = 0;
+  final PageController _somoPageController =
+      PageController(viewportFraction: 0.88);
+  int _currentSomoPage = 0;
 
   final List<PostModel> _hotPosts = [];
   DocumentSnapshot? _lastHotDoc;
@@ -59,7 +61,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
   @override
   void initState() {
     super.initState();
-    _fetchFeaturedPosts();
     _fetchHotPosts();
     _loadUserData();
     _initNotifications();
@@ -107,6 +108,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
   @override
   void dispose() {
     _hotScrollController.dispose();
+    _somoPageController.dispose();
     super.dispose();
   }
 
@@ -121,29 +123,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
         !_isLoadingHot &&
         _hasMoreHot) {
       _fetchHotPosts();
-    }
-  }
-
-  Future<void> _fetchFeaturedPosts() async {
-    if (_isLoadingFeatured || !_hasMoreFeatured) return;
-    setState(() => _isLoadingFeatured = true);
-    try {
-      final posts = await _postService.getFeaturedPosts(
-        startAfter: _lastFeaturedDoc,
-        limit: 10,
-      );
-      if (posts.length < 10) _hasMoreFeatured = false;
-      if (posts.isNotEmpty) {
-        final lastDoc = await _postService.getLastFeaturedDoc(_lastFeaturedDoc);
-        _lastFeaturedDoc = lastDoc;
-      }
-      setState(() {
-        _featuredPosts.addAll(posts);
-        _isLoadingFeatured = false;
-      });
-    } catch (e) {
-      debugPrint('Error fetching featured posts: $e');
-      setState(() => _isLoadingFeatured = false);
     }
   }
 
@@ -200,9 +179,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
           const SizedBox(height: 28),
           _buildSectionHeader('Somo la Leo!', onMore: () => _switchTab(0)),
           const SizedBox(height: 14),
-          _buildLessonsCarousel(),
-          const SizedBox(height: 8),
-          _buildPageDots(),
+          _buildSomoLaLeoSection(),
           const SizedBox(height: 28),
           _buildSectionHeader('Mada za Moto!', onMore: () => _switchTab(0)),
           const SizedBox(height: 14),
@@ -426,7 +403,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 GestureDetector(
                   onTap: () => showSearch(
                     context: context,
-                    delegate: PostSearchDelegate(),
+                    delegate: CategorySearchDelegate(),
                   ),
                   child: Container(
                     height: 52,
@@ -449,7 +426,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         const SizedBox(width: 10),
                         const Expanded(
                           child: Text(
-                            'Tafuta masomo, mada...',
+                            'Tafuta categories...',
                             style: TextStyle(
                               color: Color(0xFFADB5BD),
                               fontSize: 14,
@@ -531,60 +508,90 @@ class _HomeDashboardState extends State<HomeDashboard> {
     );
   }
 
-  // ── Featured carousel ────────────────────────────────────────
+  // ── Somo la Leo: categories carousel ──────────────────────────
+  // Requirement #2: this section shows Categories (not individual posts) —
+  // the associated posts live inside each category, same as Explore.
 
-  Widget _buildLessonsCarousel() {
-    if (_featuredPosts.isEmpty && _isLoadingFeatured) {
-      return SizedBox(
-        height: 220,
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: 3,
-          itemBuilder: (context, i) => Container(
-            width: MediaQuery.of(context).size.width * 0.82,
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            child: Shimmer.fromColors(
-              baseColor: const Color(0xFFE0E6EF),
-              highlightColor: const Color(0xFFF4F7FC),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                ),
+  Widget _buildSomoLaLeoSection() {
+    return StreamBuilder<List<Category>>(
+      stream: _categoryService.getCategories(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return _buildSomoLaLeoShimmer();
+        }
+
+        if (snapshot.hasError) {
+          return SizedBox(
+            height: 220,
+            child: Center(child: Text('Error: ${snapshot.error}')),
+          );
+        }
+
+        final categories = snapshot.data!;
+        final topLevel =
+            categories.where((c) => c.parentId == null).toList();
+
+        if (topLevel.isEmpty) {
+          return const SizedBox(
+            height: 220,
+            child: Center(child: Text('Hakuna categories kwa sasa.')),
+          );
+        }
+
+        if (_currentSomoPage >= topLevel.length) _currentSomoPage = 0;
+
+        // Only used to decide, at tap time, which screen to push — same
+        // pattern as explore_fragment.dart.
+        final parentIdsWithChildren =
+            categories.map((c) => c.parentId).whereType<String>().toSet();
+
+        return Column(
+          children: [
+            SizedBox(
+              height: 220,
+              child: PageView.builder(
+                controller: _somoPageController,
+                itemCount: topLevel.length,
+                onPageChanged: (index) =>
+                    setState(() => _currentSomoPage = index),
+                itemBuilder: (context, index) {
+                  final category = topLevel[index];
+                  return _buildSomoCategoryCard(
+                    category,
+                    hasChildren: parentIdsWithChildren.contains(category.id),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildPageDots(topLevel.length),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSomoLaLeoShimmer() {
+    return SizedBox(
+      height: 220,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: 3,
+        itemBuilder: (context, i) => Container(
+          width: MediaQuery.of(context).size.width * 0.82,
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+          child: Shimmer.fromColors(
+            baseColor: const Color(0xFFE0E6EF),
+            highlightColor: const Color(0xFFF4F7FC),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(22),
               ),
             ),
           ),
         ),
-      );
-    }
-
-    if (_featuredPosts.isEmpty) {
-      return const SizedBox(
-        height: 220,
-        child: Center(child: Text('Hakuna masomo kwa sasa.')),
-      );
-    }
-
-    return SizedBox(
-      height: 220,
-      child: PageView.builder(
-        itemCount: _featuredPosts.length + (_hasMoreFeatured ? 1 : 0),
-        controller: PageController(viewportFraction: 0.88),
-        onPageChanged: (index) {
-          if (index < _featuredPosts.length) {
-            setState(() => _currentFeaturedPage = index);
-          }
-          if (index == _featuredPosts.length - 1 && _hasMoreFeatured) {
-            _fetchFeaturedPosts();
-          }
-        },
-        itemBuilder: (context, index) {
-          if (index == _featuredPosts.length) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          return _buildFeaturedCard(_featuredPosts[index]);
-        },
       ),
     );
   }
@@ -596,23 +603,26 @@ class _HomeDashboardState extends State<HomeDashboard> {
     final updated = await _postService.getPostById(post.id);
     if (updated == null || !mounted) return;
     setState(() {
-      final fIndex = _featuredPosts.indexWhere((p) => p.id == updated.id);
-      if (fIndex != -1) _featuredPosts[fIndex] = updated;
       final hIndex = _hotPosts.indexWhere((p) => p.id == updated.id);
       if (hIndex != -1) _hotPosts[hIndex] = updated;
     });
   }
 
-  Widget _buildFeaturedCard(PostModel post) {
+  Widget _buildSomoCategoryCard(Category category, {required bool hasChildren}) {
     return GestureDetector(
-      onTap: () => _openPostAndRefresh(post),
+      onTap: () => openCategory(context, category, hasChildren: hasChildren),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [category.color, category.color.withAlpha(180)],
+          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF00008B).withAlpha(50),
+              color: category.color.withAlpha(80),
               blurRadius: 18,
               offset: const Offset(0, 8),
             ),
@@ -623,94 +633,51 @@ class _HomeDashboardState extends State<HomeDashboard> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Background image
-              if (post.thumbnail.isNotEmpty)
-                Image.network(
-                  post.thumbnail,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: double.infinity,
-                  loadingBuilder: (_, child, progress) {
-                    if (progress == null) return child;
-                    return Shimmer.fromColors(
-                      baseColor: const Color(0xFFE0E6EF),
-                      highlightColor: const Color(0xFFF4F7FC),
-                      child: Container(color: Colors.white),
-                    );
-                  },
-                )
-              else
-                Image.asset('assets/images/g272.png', fit: BoxFit.cover),
-              // Bottom-up gradient for text readability
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Color(0xDD00008B)],
-                    stops: [0.35, 1.0],
-                  ),
+              Center(
+                child: Icon(
+                  category.icon,
+                  color: Colors.white.withAlpha(50),
+                  size: 130,
                 ),
               ),
-              // "Soma" chip — top right
-              Positioned(
-                top: 14,
-                right: 14,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(230),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'Somo',
-                    style: TextStyle(
-                      color: Color(0xFF0077C2),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+              if (category.isProtected)
+                Positioned(
+                  top: 14,
+                  right: 14,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(230),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.lock_rounded,
+                      size: 16,
+                      color: category.color,
                     ),
                   ),
                 ),
-              ),
-              // Title + subtitle — bottom left
+              // Icon + name — bottom left
               Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16,
+                left: 20,
+                right: 20,
+                bottom: 20,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Icon(category.icon, color: Colors.white, size: 32),
+                    const SizedBox(height: 10),
                     Text(
-                      post.title,
+                      category.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 17,
+                        fontSize: 19,
                         fontWeight: FontWeight.bold,
-                        height: 1.3,
+                        height: 1.2,
                       ),
-                    ),
-                    if (post.subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        post.subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withAlpha(180),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    PostStatsRow(
-                      postId: post.id,
-                      likeCount: post.likeCount,
-                      commentCount: post.commentCount,
-                      iconColor: Colors.white70,
                     ),
                   ],
                 ),
@@ -724,13 +691,13 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   // ── Page dots ────────────────────────────────────────────────
 
-  Widget _buildPageDots() {
-    if (_featuredPosts.length <= 1) return const SizedBox.shrink();
-    final dotCount = _featuredPosts.length.clamp(0, 8);
+  Widget _buildPageDots(int count) {
+    if (count <= 1) return const SizedBox.shrink();
+    final dotCount = count.clamp(0, 8);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(dotCount, (i) {
-        final isActive = i == _currentFeaturedPage;
+        final isActive = i == _currentSomoPage;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           margin: const EdgeInsets.symmetric(horizontal: 3),

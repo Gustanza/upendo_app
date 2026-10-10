@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/poll_model.dart';
 import '../models/thread_post_model.dart';
 import '../models/thread_reply_model.dart';
 import '../services/conversation_service.dart';
 import '../services/thread_interaction_service.dart';
 import '../services/thread_post_service.dart';
 import '../utils/time_ago.dart';
+import '../widgets/poll_view.dart';
 import '../widgets/thread_stats_row.dart';
 import 'conversation_screen.dart';
 
@@ -188,7 +191,20 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             ),
           ],
         ),
-        if (post.text.isNotEmpty) ...[
+        if (post.type == PollType.hostType) ...[
+          const SizedBox(height: 14),
+          PollView(
+            poll: PollData.fromHostFields(
+              question: post.text,
+              pollType: post.pollType,
+              options: post.pollOptions,
+            ),
+            responsesRef: FirebaseFirestore.instance
+                .collection('threadPosts')
+                .doc(post.id)
+                .collection('pollResponses'),
+          ),
+        ] else if (post.text.isNotEmpty) ...[
           const SizedBox(height: 14),
           Text(
             post.text,

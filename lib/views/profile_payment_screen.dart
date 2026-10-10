@@ -5,10 +5,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:upendo_app/views/home_dashboard.dart';
 
-enum _PaymentState { loading, selectPackage, initiating, waiting }
+enum _PaymentState { loading, selectPackage, enterPhone, initiating, waiting, failed }
 
 class ProfilePaymentScreen extends StatefulWidget {
   const ProfilePaymentScreen({super.key});
@@ -18,14 +18,17 @@ class ProfilePaymentScreen extends StatefulWidget {
 }
 
 class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
-  static const _subscribeUrl = 'https://subscribe-dcnp2gn42a-uc.a.run.app';
-  static const _callbackUrl  = 'https://moyoapptanzania-cf0e7.web.app';
+  static const _subscribeUrl = 'https://us-central1-moyoapptanzania-cf0e7.cloudfunctions.net/subscribeClickPesa';
 
   _PaymentState _state = _PaymentState.loading;
   List<Map<String, dynamic>> _packages = [];
   String? _selectedPackageId;
   String? _errorMessage;
+  String _phoneNumber = '';
+  bool _showAllPackages = false;
+  static const _collapsedPackageCount = 4;
   StreamSubscription<DocumentSnapshot>? _userSub;
+  StreamSubscription<DocumentSnapshot>? _subscriptionSub;
 
   @override
   void initState() {
@@ -36,6 +39,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
   @override
   void dispose() {
     _userSub?.cancel();
+    _subscriptionSub?.cancel();
     super.dispose();
   }
 
@@ -48,10 +52,27 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
           .where('isActive', isEqualTo: true)
           .get();
       final pkgs = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+
+      // Prefill the phone step with whatever number is already on the
+      // account, stripped of the leading "+" auth_screen.dart stores it with.
+      final user = FirebaseAuth.instance.currentUser;
+      String initialPhone = '';
+      if (user != null) {
+        final userSnap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final stored = userSnap.data()?['phone'] as String?;
+        if (stored != null) {
+          initialPhone = stored.replaceFirst('+', '');
+        }
+      }
+
       if (!mounted) return;
       setState(() {
         _packages = pkgs;
         _selectedPackageId = pkgs.isNotEmpty ? pkgs.first['id'] as String : null;
+        _phoneNumber = initialPhone;
         _state = _PaymentState.selectPackage;
       });
     } catch (_) {
@@ -63,8 +84,16 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
     }
   }
 
-  Future<void> _initiatePayment() async {
+  void _proceedToPhoneEntry() {
     if (_selectedPackageId == null) return;
+    setState(() {
+      _errorMessage = null;
+      _state = _PaymentState.enterPhone;
+    });
+  }
+
+  Future<void> _initiatePayment() async {
+    if (_selectedPackageId == null || _phoneNumber.isEmpty) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -80,7 +109,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
         body: jsonEncode({
           'userId': user.uid,
           'packageId': _selectedPackageId,
-          'callback_url': _callbackUrl,
+          'phoneNumber': _phoneNumber,
         }),
       );
 
@@ -89,22 +118,24 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
       if (err != null) {
         if (!mounted) return;
         setState(() {
-          _state = _PaymentState.selectPackage;
+          _state = _PaymentState.enterPhone;
           _errorMessage = (err as Map)['message']?.toString() ?? 'Hitilafu imetokea.';
         });
         return;
       }
 
-      final redirectUrl = data['redirect_url'] as String;
-      await launchUrl(Uri.parse(redirectUrl), mode: LaunchMode.externalApplication);
+      final subscriptionId = data['subscription_id'] as String;
 
       if (!mounted) return;
-      setState(() => _state = _PaymentState.waiting);
+      setState(() {
+        _state = _PaymentState.waiting;
+      });
       _listenForActivation(user.uid);
+      _listenForFailure(subscriptionId);
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _state = _PaymentState.selectPackage;
+        _state = _PaymentState.enterPhone;
         _errorMessage = 'Hitilafu imetokea. Angalia mtandao na ujaribu tena.';
       });
     }
@@ -120,10 +151,33 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
           if (!mounted) return;
           if (snap.data()?['isActive'] == true) {
             _userSub?.cancel();
+            _subscriptionSub?.cancel();
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (_) => const HomeDashboard()),
             );
+          }
+        });
+  }
+
+  // ClickPesa's webhook resolves within seconds of the customer entering (or
+  // cancelling) their PIN, so we can surface a failure immediately instead of
+  // leaving the user on an indefinite spinner like PesaPal's redirect flow did.
+  void _listenForFailure(String subscriptionId) {
+    _subscriptionSub?.cancel();
+    _subscriptionSub = FirebaseFirestore.instance
+        .collection('subscriptions')
+        .doc(subscriptionId)
+        .snapshots()
+        .listen((snap) {
+          if (!mounted) return;
+          if (snap.data()?['status'] == 'Failed') {
+            _userSub?.cancel();
+            _subscriptionSub?.cancel();
+            setState(() {
+              _errorMessage = snap.data()?['message']?.toString() ?? 'Malipo hayakufanikiwa.';
+              _state = _PaymentState.failed;
+            });
           }
         });
   }
@@ -151,8 +205,16 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
 
   void _goBackToSelection() {
     _userSub?.cancel();
+    _subscriptionSub?.cancel();
     setState(() {
       _state = _PaymentState.selectPackage;
+      _errorMessage = null;
+    });
+  }
+
+  void _retryFromFailure() {
+    setState(() {
+      _state = _PaymentState.enterPhone;
       _errorMessage = null;
     });
   }
@@ -201,9 +263,11 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
                   child: switch (_state) {
-                    _PaymentState.loading    => _buildLoading(),
-                    _PaymentState.initiating => _buildInitiating(),
-                    _PaymentState.waiting    => _buildWaiting(),
+                    _PaymentState.loading      => _buildLoading(),
+                    _PaymentState.enterPhone   => _buildEnterPhone(),
+                    _PaymentState.initiating   => _buildInitiating(),
+                    _PaymentState.waiting      => _buildWaiting(),
+                    _PaymentState.failed       => _buildFailed(),
                     _PaymentState.selectPackage => _buildSelectPackage(),
                   },
                 ),
@@ -227,6 +291,102 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
     );
   }
 
+  // ── State: confirm phone number for the USSD push ────────────
+
+  Widget _buildEnterPhone() {
+    return Padding(
+      key: const ValueKey('enterPhone'),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          if (_errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          const Text(
+            'Thibitisha namba ya simu utakayolipia',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Utapokea ujumbe wa kuweka PIN kwenye namba hii',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            clipBehavior: Clip.antiAlias,
+            child: IntlPhoneField(
+              initialCountryCode: 'TZ',
+              initialValue: _phoneNumber.isNotEmpty ? _phoneNumber : null,
+              style: const TextStyle(color: Colors.black87),
+              dropdownTextStyle: const TextStyle(color: Colors.black87),
+              decoration: const InputDecoration(
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+                counterText: '',
+                hintText: '0754 xxx xxx',
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+              ),
+              onChanged: (p) => _phoneNumber = p.completeNumber.replaceFirst('+', ''),
+            ),
+          ),
+          const SizedBox(height: 22),
+
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _phoneNumber.isNotEmpty ? _initiatePayment : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00AEEF),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.white24,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text(
+                'LIPIA SASA',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          TextButton(
+            onPressed: _goBackToSelection,
+            child: const Text(
+              'Rudi nyuma',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── State: calling subscribe function ────────────────────────
 
   Widget _buildInitiating() {
@@ -246,7 +406,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
     );
   }
 
-  // ── State: browser open, waiting for PesaPal IPN ─────────────
+  // ── State: USSD push sent, waiting for customer to enter PIN ─
 
   Widget _buildWaiting() {
     return Padding(
@@ -263,10 +423,10 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
             ),
             child: Column(
               children: [
-                const Icon(Icons.open_in_browser_rounded, color: Colors.white, size: 44),
+                const Icon(Icons.phonelink_ring_rounded, color: Colors.white, size: 44),
                 const SizedBox(height: 14),
                 const Text(
-                  'Ukurasa wa malipo umefunguliwa',
+                  'Angalia simu yako',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white,
@@ -276,7 +436,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Kamilisha malipo kwenye kivinjari. Programu itafunguka moja kwa moja baada ya malipo kukubaliwa.',
+                  'Tumetuma ombi la malipo kwenye simu yako. Weka PIN yako kukamilisha malipo. Programu itafunguka moja kwa moja baada ya malipo kukubaliwa.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white.withAlpha(217),
@@ -335,6 +495,70 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
     );
   }
 
+  // ── State: ClickPesa reported the payment failed ─────────────
+
+  Widget _buildFailed() {
+    return Padding(
+      key: const ValueKey('failed'),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(38),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withAlpha(77)),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.orangeAccent, size: 44),
+                const SizedBox(height: 14),
+                const Text(
+                  'Malipo hayakufanikiwa',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _errorMessage ?? 'Jaribu tena.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(217),
+                    fontSize: 13,
+                    height: 1.55,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _retryFromFailure,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF00008B),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text(
+                'JARIBU TENA',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── State: package selection ─────────────────────────────────
 
   Widget _buildSelectPackage() {
@@ -381,7 +605,26 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
             ),
             const SizedBox(height: 14),
 
-            ..._packages.map(_buildPackageCard),
+            ...(_showAllPackages ? _packages : _packages.take(_collapsedPackageCount))
+                .map(_buildPackageCard),
+
+            if (_packages.length > _collapsedPackageCount)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextButton(
+                  onPressed: () => setState(() => _showAllPackages = !_showAllPackages),
+                  child: Text(
+                    _showAllPackages
+                        ? 'Onyesha vichache'
+                        : 'Ona vifurushi vingine (${_packages.length - _collapsedPackageCount})',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
 
             const SizedBox(height: 22),
 
@@ -389,7 +632,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: _selectedPackageId != null ? _initiatePayment : null,
+                onPressed: _selectedPackageId != null ? _proceedToPhoneEntry : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00AEEF),
                   foregroundColor: Colors.white,
