@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /threadPosts/{postId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      // Deletes happen via the cleanupThreadPost Cloud Function (Admin SDK,
+      // bypasses these rules) when the Firestore doc is deleted.
+      allow delete: if false;
+    }
+
+    // Everything else (admin-curated content uploaded from the Vue
+    // dashboard — thumbnails/, posts/{type}s/, etc.) — same permissive,
+    // authenticated-only posture as firestore.rules uses for /posts,
+    // /categories, /packages and friends.
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

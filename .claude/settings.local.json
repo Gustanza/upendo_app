@@ -5,7 +5,27 @@
       "Bash(xargs grep *)",
       "Bash(firebase --version)",
       "Bash(dart analyze *)",
-      "Bash(flutter pub *)"
+      "Bash(flutter pub *)",
+      "Bash(sudo mv ~/Downloads/android-studio /opt/android-studio)",
+      "Bash(flutter doctor *)",
+      "Bash(find /home/gustanza -name \"sdkmanager\" 2>/dev/null | head -5 && find /home/gustanza -maxdepth 5 -name \"platform-tools\" -type d 2>/dev/null | head -5)",
+      "Read(//home/gustanza/**)",
+      "Bash(flutter --version)",
+      "Bash(flutter config *)",
+      "Bash(find /home/gustanza/AndroidStudioProjects/upendo_app/build -name \"*.log\" 2>/dev/null | head -10 && find /tmp -name \"gradle*\" -newer /home/gustanza/AndroidStudioProjects/upendo_app/pubspec.yaml 2>/dev/null | head -5)",
+      "Read(//tmp/**)",
+      "Bash(xargs ls -t)",
+      "Bash(find /home/gustanza/Android/Sdk -name \"sdkmanager\" 2>/dev/null && find /opt/android-studio -name \"sdkmanager\" 2>/dev/null | head -5)",
+      "Read(//opt/android-studio/**)",
+      "Bash(flutter analyze *)",
+      "Bash(npm install *)",
+      "Read(//home/gustanza/.nvm/**)",
+      "Read(//usr/local/bin/**)",
+      "Bash(node --check search/searchPosts.js)",
+      "Bash(node -e \"require\\('./search/searchPosts.js'\\)\")",
+      "Bash(node -e \"require\\('./interactions/counters.js'\\); console.log\\('counters.js OK - exports:', Object.keys\\(require\\('./interactions/counters.js'\\)\\)\\)\")",
+      "Bash(command -v node)",
+      "Bash(find / -maxdepth 4 -iname \"node\" -type f)"
     ]
   }
 }

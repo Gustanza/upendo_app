@@ -1,12 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { auth } from '../fireconfigs.js'
-import DashboardLayout  from '../layouts/DashboardLayout.vue'
-import DashboardHome    from '../views/DashboardHome.vue'
-import PostsView        from '../views/PostsView.vue'
-import CategoriesView   from '../views/CategoriesView.vue'
-import UsersView        from '../views/UsersView.vue'
-import PackagesView     from '../views/PackagesView.vue'
-import LoginView        from '../views/LoginView.vue'
+import DashboardLayout    from '../layouts/DashboardLayout.vue'
+import DashboardHome      from '../views/DashboardHome.vue'
+import PostsView          from '../views/PostsView.vue'
+import CategoriesView     from '../views/CategoriesView.vue'
+import UsersView          from '../views/UsersView.vue'
+import PackagesView       from '../views/PackagesView.vue'
+import NotificationsView  from '../views/NotificationsView.vue'
+import LoginView          from '../views/LoginView.vue'
 
 const routes = [
   {
@@ -22,7 +23,8 @@ const routes = [
       { path: 'posts',      component: PostsView },
       { path: 'categories', component: CategoriesView },
       { path: 'users',      component: UsersView },
-      { path: 'packages',   component: PackagesView },
+      { path: 'packages',       component: PackagesView },
+      { path: 'notifications',  component: NotificationsView },
     ],
   },
 ]

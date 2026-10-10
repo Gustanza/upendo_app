@@ -29,6 +29,121 @@
             {
               "client_id": "630293487516-bvq0lru5161duniovg3po3blbev03hbg.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "630293487516-j6torotv4d4hcrvp6qjn250b3uibeb62.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.upendoApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:630293487516:android:83f16dab20e7053c653259",
+        "android_client_info": {
+          "package_name": "com.haflaway.moyoapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "630293487516-bvq0lru5161duniovg3po3blbev03hbg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDG8y7RQtbWJSGq8yGS6YnhdHTuIBUN4E8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "630293487516-bvq0lru5161duniovg3po3blbev03hbg.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "630293487516-j6torotv4d4hcrvp6qjn250b3uibeb62.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.upendoApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:630293487516:android:b3c9edac9be7963c653259",
+        "android_client_info": {
+          "package_name": "com.haflaway.moyoapptanzania"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "630293487516-bvq0lru5161duniovg3po3blbev03hbg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDG8y7RQtbWJSGq8yGS6YnhdHTuIBUN4E8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "630293487516-bvq0lru5161duniovg3po3blbev03hbg.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "630293487516-j6torotv4d4hcrvp6qjn250b3uibeb62.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.upendoApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:630293487516:android:40831bf47475ca56653259",
+        "android_client_info": {
+          "package_name": "com.moyoapp.tanzania"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "630293487516-bvq0lru5161duniovg3po3blbev03hbg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDG8y7RQtbWJSGq8yGS6YnhdHTuIBUN4E8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "630293487516-bvq0lru5161duniovg3po3blbev03hbg.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "630293487516-j6torotv4d4hcrvp6qjn250b3uibeb62.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.upendoApp"
+              }
             }
           ]
         }

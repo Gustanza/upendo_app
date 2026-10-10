@@ -17,29 +17,17 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -54,9 +42,48 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDG8y7RQtbWJSGq8yGS6YnhdHTuIBUN4E8',
-    appId: '1:630293487516:android:d43a938da9bb7165653259',
+    appId: '1:630293487516:android:40831bf47475ca56653259',
     messagingSenderId: '630293487516',
     projectId: 'moyoapptanzania-cf0e7',
     storageBucket: 'moyoapptanzania-cf0e7.firebasestorage.app',
+  );
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyBBQf0DbEAOtFZk7paGD6hJymcbw83TH4o',
+    appId: '1:630293487516:web:7be24738f3212f60653259',
+    messagingSenderId: '630293487516',
+    projectId: 'moyoapptanzania-cf0e7',
+    authDomain: 'moyoapptanzania-cf0e7.firebaseapp.com',
+    storageBucket: 'moyoapptanzania-cf0e7.firebasestorage.app',
+    measurementId: 'G-VT1BP2PSZT',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyCsyP18El3ZefP1s7SS52_cj0s00uLnYtg',
+    appId: '1:630293487516:ios:a3073806e11d60c8653259',
+    messagingSenderId: '630293487516',
+    projectId: 'moyoapptanzania-cf0e7',
+    storageBucket: 'moyoapptanzania-cf0e7.firebasestorage.app',
+    iosClientId: '630293487516-j6torotv4d4hcrvp6qjn250b3uibeb62.apps.googleusercontent.com',
+    iosBundleId: 'com.example.upendoApp',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyCsyP18El3ZefP1s7SS52_cj0s00uLnYtg',
+    appId: '1:630293487516:ios:9858962fad95a523653259',
+    messagingSenderId: '630293487516',
+    projectId: 'moyoapptanzania-cf0e7',
+    storageBucket: 'moyoapptanzania-cf0e7.firebasestorage.app',
+    iosClientId: '630293487516-lnn408dhhk6jsqtume11hdjradd0oga5.apps.googleusercontent.com',
+    iosBundleId: 'com.haflaway.moyoapptanzania',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyBBQf0DbEAOtFZk7paGD6hJymcbw83TH4o',
+    appId: '1:630293487516:web:db2b2d9c76805e65653259',
+    messagingSenderId: '630293487516',
+    projectId: 'moyoapptanzania-cf0e7',
+    authDomain: 'moyoapptanzania-cf0e7.firebaseapp.com',
+    storageBucket: 'moyoapptanzania-cf0e7.firebasestorage.app',
+    measurementId: 'G-JTHN52KB6F',
   );
 }

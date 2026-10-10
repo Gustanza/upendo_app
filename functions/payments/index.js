@@ -2,8 +2,8 @@ const axios = require('axios');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { onRequest } = require('firebase-functions/v2/https');
 
-const CONSUMER_KEY = "cFt6sZVPpt6hzIMiCvCnDA+Xi27At/+x";
-const CONSUMER_SECRET = "GcLyvCpNUBd4DHsgFQjWrKbAPaQ=";
+const CONSUMER_KEY = "vNdwWW80VuOrkiozwtGoI0SFJb+oRuDk";
+const CONSUMER_SECRET = "JGmtvImHCX1t29RP/RmrWlGiz58=";
 
 // Update this after first deploy — grab the resolvePayment URL from Firebase console
 const RESOLVE_PAYMENT_URL = "https://resolvepayment-dcnp2gn42a-uc.a.run.app";

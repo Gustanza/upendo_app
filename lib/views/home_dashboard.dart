@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:in_app_update/in_app_update.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:upendo_app/views/explore_fragment.dart';
 import 'package:upendo_app/views/chat_fragment.dart';
@@ -7,9 +10,13 @@ import 'package:upendo_app/views/post_detail_screen.dart';
 import 'package:upendo_app/views/account_fragment.dart';
 import 'package:upendo_app/views/post_search_delegate.dart';
 import 'package:upendo_app/views/saved_fragment.dart';
+import 'package:upendo_app/views/notifications_screen.dart';
 import '../models/post_model.dart';
+import '../models/notification_model.dart';
 import '../services/post_service.dart';
 import '../services/user_preferences.dart';
+import '../services/notification_service.dart';
+import '../widgets/post_stats_row.dart';
 
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({super.key});
@@ -39,13 +46,18 @@ class _HomeDashboardState extends State<HomeDashboard> {
   final GlobalKey<SavedFragmentState> _savedFragmentKey =
       GlobalKey<SavedFragmentState>();
 
+  int _notifLastSeenMs = 0;
+  Stream<List<AppNotification>>? _notifStream;
+
   @override
   void initState() {
     super.initState();
     _fetchFeaturedPosts();
     _fetchHotPosts();
     _loadUserData();
+    _initNotifications();
     _hotScrollController.addListener(_onHotScroll);
+    _checkForUpdate();
   }
 
   Future<void> _loadUserData() async {
@@ -53,6 +65,26 @@ class _HomeDashboardState extends State<HomeDashboard> {
     if (user != null && mounted) {
       setState(() => _userName = user.fullName);
     }
+  }
+
+  Future<void> _initNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _notifLastSeenMs = prefs.getInt('notif_last_seen') ?? 0;
+      _notifStream = NotificationService().getNotifications();
+    });
+  }
+
+  Future<void> _checkForUpdate() async {
+    if (!kReleaseMode) return;
+    try {
+      final info = await InAppUpdate.checkForUpdate();
+      if (info.updateAvailability == UpdateAvailability.updateAvailable) {
+        await InAppUpdate.startFlexibleUpdate();
+        await InAppUpdate.completeFlexibleUpdate();
+      }
+    } catch (_) {}
   }
 
   @override
@@ -243,22 +275,67 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(30),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withAlpha(60),
-                          width: 1,
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.notifications_none_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
+                    StreamBuilder<List<AppNotification>>(
+                      stream: _notifStream,
+                      builder: (context, snapshot) {
+                        final hasUnread = (snapshot.data ?? []).any(
+                          (n) => (n.createdAt?.millisecondsSinceEpoch ?? 0) > _notifLastSeenMs,
+                        );
+                        return GestureDetector(
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const NotificationsScreen(),
+                              ),
+                            );
+                            final prefs = await SharedPreferences.getInstance();
+                            if (mounted) {
+                              setState(() => _notifLastSeenMs =
+                                  prefs.getInt('notif_last_seen') ?? 0);
+                            }
+                          },
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withAlpha(30),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withAlpha(60),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.notifications_none_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
+                              if (hasUnread)
+                                Positioned(
+                                  top: -2,
+                                  right: -2,
+                                  child: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -430,11 +507,23 @@ class _HomeDashboardState extends State<HomeDashboard> {
     );
   }
 
+  Future<void> _openPostAndRefresh(PostModel post) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
+    );
+    final updated = await _postService.getPostById(post.id);
+    if (updated == null || !mounted) return;
+    setState(() {
+      final fIndex = _featuredPosts.indexWhere((p) => p.id == updated.id);
+      if (fIndex != -1) _featuredPosts[fIndex] = updated;
+      final hIndex = _hotPosts.indexWhere((p) => p.id == updated.id);
+      if (hIndex != -1) _hotPosts[hIndex] = updated;
+    });
+  }
+
   Widget _buildFeaturedCard(PostModel post) {
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
-      ),
+      onTap: () => _openPostAndRefresh(post),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
@@ -534,6 +623,13 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 6),
+                    PostStatsRow(
+                      postId: post.id,
+                      likeCount: post.likeCount,
+                      commentCount: post.commentCount,
+                      iconColor: Colors.white70,
+                    ),
                   ],
                 ),
               ),
@@ -624,9 +720,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   Widget _buildHotCard(PostModel post) {
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
-      ),
+      onTap: () => _openPostAndRefresh(post),
       child: Container(
         width: 148,
         margin: const EdgeInsets.only(right: 14),
@@ -729,16 +823,29 @@ class _HomeDashboardState extends State<HomeDashboard> {
               child: Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                child: Text(
-                  post.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1D2E),
-                    height: 1.35,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      post.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1D2E),
+                        height: 1.35,
+                      ),
+                    ),
+                    PostStatsRow(
+                      postId: post.id,
+                      likeCount: post.likeCount,
+                      commentCount: post.commentCount,
+                      iconColor: Colors.grey,
+                      fontSize: 11,
+                    ),
+                  ],
                 ),
               ),
             ),

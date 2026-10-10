@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1073602423614",
+    "project_id": "ajira-plus-e1007",
+    "storage_bucket": "ajira-plus-e1007.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1073602423614:android:64853d62ee2f7747899a6f",
+        "android_client_info": {
+          "package_name": "com.example.ajira_plus"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCupBRrWK88namiN6L2qRG5xUE5NR3DXTM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

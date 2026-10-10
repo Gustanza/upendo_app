@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/category_model.dart';
 import '../models/post_model.dart';
 import '../services/post_service.dart';
+import '../widgets/post_stats_row.dart';
 import 'post_detail_screen.dart';
 
 class CategoryPostsScreen extends StatefulWidget {
@@ -22,6 +23,19 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
   void initState() {
     super.initState();
     _loadPosts();
+  }
+
+  Future<void> _openPostAndRefresh(PostModel post) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => PostDetailScreen(post: post)),
+    );
+    final updated = await _postService.getPostById(post.id);
+    if (updated == null || !mounted) return;
+    setState(() {
+      final index = _posts.indexWhere((p) => p.id == updated.id);
+      if (index != -1) _posts[index] = updated;
+    });
   }
 
   Future<void> _loadPosts() async {
@@ -170,12 +184,7 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PostDetailScreen(post: post),
-                ),
-              ),
+              onTap: () => _openPostAndRefresh(post),
               borderRadius: BorderRadius.circular(20),
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -242,6 +251,12 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                               color: Colors.grey,
                               fontSize: 12,
                             ),
+                          ),
+                          const SizedBox(height: 6),
+                          PostStatsRow(
+                            postId: post.id,
+                            likeCount: post.likeCount,
+                            commentCount: post.commentCount,
                           ),
                         ],
                       ),

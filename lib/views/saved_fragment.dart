@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/post_model.dart';
 import '../services/post_service.dart';
 import '../services/user_preferences.dart';
+import '../widgets/post_stats_row.dart';
 import 'post_detail_screen.dart';
 
 class SavedFragment extends StatefulWidget {
@@ -194,6 +195,12 @@ class SavedFragmentState extends State<SavedFragment> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 6),
+                    PostStatsRow(
+                      postId: post.id,
+                      likeCount: post.likeCount,
+                      commentCount: post.commentCount,
                     ),
                   ],
                 ),

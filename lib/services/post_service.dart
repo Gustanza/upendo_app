@@ -1,8 +1,13 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
 import '../models/post_model.dart';
 
 class PostService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  static const String _searchPostsUrl =
+      'https://searchposts-dcnp2gn42a-uc.a.run.app';
 
   Future<List<PostModel>> getFeaturedPosts({
     DocumentSnapshot? startAfter,
@@ -69,6 +74,12 @@ class PostService {
     return snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
   }
 
+  Future<PostModel?> getPostById(String postId) async {
+    final doc = await _db.collection('posts').doc(postId).get();
+    if (!doc.exists) return null;
+    return PostModel.fromFirestore(doc);
+  }
+
   Future<List<PostModel>> getPostsByCategory(String categoryId) async {
     QuerySnapshot snapshot = await _db
         .collection('posts')
@@ -80,16 +91,24 @@ class PostService {
   Future<List<PostModel>> searchPosts(String query) async {
     if (query.isEmpty) return [];
 
-    // Firestore prefix search
-    QuerySnapshot snapshot = await _db
-        .collection('posts')
-        .orderBy('title')
-        .startAt([query])
-        .endAt([query + '\uf8ff'])
-        .limit(20)
-        .get();
+    final uri = Uri.parse(_searchPostsUrl).replace(
+      queryParameters: {'q': query},
+    );
 
-    return snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList();
+    final response = await http.get(uri);
+    if (response.statusCode != 200) {
+      throw Exception('searchPosts failed: ${response.statusCode}');
+    }
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final results = (body['results'] as List<dynamic>? ?? []);
+
+    return results
+        .map((item) => PostModel.fromMap(
+              item['id'] as String,
+              item as Map<String, dynamic>,
+            ))
+        .toList();
   }
 
   Future<List<PostModel>> getPostsByIds(List<String> ids) async {
