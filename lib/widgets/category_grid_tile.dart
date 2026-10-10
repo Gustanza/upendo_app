@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/category_model.dart';
+import 'unread_badge.dart';
 
 // The circular icon + label tile used by both the top-level category grid
 // (explore_fragment.dart) and the sub-category grid (subcategories_screen.dart)
@@ -21,6 +22,7 @@ class CategoryGridTile extends StatelessWidget {
       child: Column(
         children: [
           Stack(
+            clipBehavior: Clip.none,
             children: [
               Container(
                 width: 90,
@@ -66,6 +68,11 @@ class CategoryGridTile extends StatelessWidget {
                     ),
                   ),
                 ),
+              Positioned(
+                top: -2,
+                right: -2,
+                child: UnreadBadge(categoryId: category.id),
+              ),
             ],
           ),
           const SizedBox(height: 8),

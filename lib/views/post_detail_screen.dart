@@ -7,6 +7,7 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../models/post_model.dart';
 import '../models/comment_model.dart';
 import '../models/poll_model.dart';
+import '../services/unread_badge_service.dart';
 import '../services/user_preferences.dart';
 import '../services/post_interaction_service.dart';
 import '../widgets/poll_view.dart';
@@ -34,6 +35,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       _initializePlayer();
     }
     _checkSavedStatus();
+    UnreadBadgeService.instance.markPostSeen(widget.post.id);
   }
 
   Future<void> _checkSavedStatus() async {

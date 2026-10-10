@@ -1,13 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
+import '../models/attachment_model.dart';
 import '../models/poll_model.dart';
 import '../models/thread_post_model.dart';
+import 'attachment_service.dart';
 
 class ThreadPostService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   CollectionReference<Map<String, dynamic>> get _threadPosts =>
       _db.collection('threadPosts');
@@ -36,35 +35,41 @@ class ThreadPostService {
     return ThreadPostModel.fromFirestore(doc);
   }
 
-  // Creates the doc first (so we have an id to scope the Storage path to),
-  // then uploads the image and attaches its URL — keeps orphaned uploads
-  // impossible to reference even if the upload step fails.
-  Future<void> createPost({required String text, XFile? image, PollData? poll}) async {
+  // Reserves the doc id first (to scope the Storage folder), uploads the
+  // attachments, then writes the doc — so the feed never shows a post whose
+  // media is still uploading. Everything under threadPosts/{id}/ is removed
+  // by the cleanupThreadPost Cloud Function when the post is deleted.
+  Future<void> createPost({
+    required String text,
+    List<PendingAttachment> attachments = const [],
+    PollData? poll,
+    void Function(double progress)? onUploadProgress,
+  }) async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final userDoc = await _db.collection('users').doc(uid).get();
     final authorName = (userDoc.data()?['fullName'] as String?) ?? 'Mtumiaji';
 
-    final docRef = await _threadPosts.add({
+    final docRef = _threadPosts.doc();
+    final uploaded = await AttachmentService().uploadAll(
+      'threadPosts/${docRef.id}',
+      attachments,
+      onProgress: onUploadProgress,
+    );
+    final firstImage =
+        uploaded.where((a) => a.type == Attachment.image).firstOrNull;
+
+    await docRef.set({
       'authorId': uid,
       'authorName': authorName,
       'text': text.trim(),
-      'imageUrl': null,
+      'imageUrl': firstImage?.url,
       'createdAt': FieldValue.serverTimestamp(),
       'type': poll != null ? PollType.hostType : 'text',
       'pollType': poll?.pollType,
       'pollOptions': poll?.options,
+      if (uploaded.isNotEmpty)
+        'attachments': uploaded.map((a) => a.toMap()).toList(),
     });
-
-    if (image != null) {
-      final path = 'threadPosts/${docRef.id}/image.jpg';
-      final ref = _storage.ref(path);
-      await ref.putData(
-        await image.readAsBytes(),
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
-      final url = await ref.getDownloadURL();
-      await docRef.update({'imageUrl': url, 'imagePath': path});
-    }
   }
 
   Future<void> deletePost(String postId) {

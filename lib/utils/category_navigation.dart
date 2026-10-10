@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/category_model.dart';
+import '../services/unread_badge_service.dart';
 import '../views/category_posts_screen.dart';
 import '../views/subcategories_screen.dart';
 import '../widgets/category_password_dialog.dart';
@@ -26,6 +27,7 @@ Future<void> openCategory(
     if (unlocked != true) return;
   }
   if (!context.mounted) return;
+  UnreadBadgeService.instance.markCategorySeen(category.id);
 
   if (!hasChildren) {
     Navigator.push(

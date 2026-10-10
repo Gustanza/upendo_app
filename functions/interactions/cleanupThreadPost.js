@@ -21,11 +21,11 @@ const cleanupThreadPost = onDocumentDeleted('threadPosts/{postId}', async (event
     deleteSubcollection(postRef.collection('likes')),
   ]);
 
-  const imagePath = event.data.data()?.imagePath;
-  if (!imagePath) return;
-
-  await getStorage().bucket().file(imagePath).delete({ ignoreNotFound: true })
-      .catch((err) => console.error(`cleanupThreadPost: failed to delete ${imagePath}`, err));
+  // Every upload for a post (legacy single image.jpg, or the attachments
+  // list) lives under threadPosts/{postId}/, so delete the whole folder.
+  const prefix = `threadPosts/${event.params.postId}/`;
+  await getStorage().bucket().deleteFiles({ prefix, force: true })
+      .catch((err) => console.error(`cleanupThreadPost: failed to delete ${prefix}`, err));
 });
 
 module.exports = { cleanupThreadPost };

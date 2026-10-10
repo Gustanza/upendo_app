@@ -8,6 +8,7 @@ import '../services/conversation_service.dart';
 import '../services/thread_interaction_service.dart';
 import '../services/thread_post_service.dart';
 import '../utils/time_ago.dart';
+import '../widgets/attachment_views.dart';
 import '../widgets/poll_view.dart';
 import '../widgets/thread_stats_row.dart';
 import 'conversation_screen.dart';
@@ -211,7 +212,10 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             style: const TextStyle(fontSize: 16, height: 1.4),
           ),
         ],
-        if (post.imageUrl != null) ...[
+        if (post.attachments.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          AttachmentsView(attachments: post.attachments),
+        ] else if (post.imageUrl != null) ...[
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
@@ -302,8 +306,11 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             Expanded(
               child: TextField(
                 controller: _replyController,
+                // Matches the replies text cap in firestore.rules.
+                maxLength: 1000,
                 decoration: InputDecoration(
                   hintText: 'Andika jibu...',
+                  counterText: '',
                   filled: true,
                   fillColor: Colors.grey.shade100,
                   border: OutlineInputBorder(

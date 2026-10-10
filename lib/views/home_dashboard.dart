@@ -23,7 +23,10 @@ import '../services/user_preferences.dart';
 import '../services/notification_service.dart';
 import '../services/conversation_service.dart';
 import '../utils/category_navigation.dart';
+import '../services/unread_badge_service.dart';
+import '../utils/share_app.dart';
 import '../widgets/post_stats_row.dart';
+import '../widgets/unread_badge.dart';
 
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({super.key});
@@ -65,6 +68,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
     _loadUserData();
     _initNotifications();
     _initConversations();
+    UnreadBadgeService.instance.start();
     _hotScrollController.addListener(_onHotScroll);
     _checkForUpdate();
   }
@@ -269,6 +273,29 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       ),
                     ),
                     const SizedBox(width: 12),
+                    Builder(
+                      builder: (btnContext) => GestureDetector(
+                        onTap: () => shareApp(btnContext),
+                        child: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(30),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withAlpha(60),
+                              width: 1,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.share_rounded,
+                            color: Colors.white,
+                            size: 21,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
                     StreamBuilder<List<AppNotification>>(
                       stream: _notifStream,
                       builder: (context, snapshot) {
@@ -657,6 +684,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
                     ),
                   ),
                 ),
+              Positioned(
+                top: 14,
+                left: 14,
+                child: UnreadBadge(categoryId: category.id),
+              ),
               // Icon + name — bottom left
               Positioned(
                 left: 20,
@@ -863,6 +895,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         ),
                       ),
                     ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: UnreadBadge(postId: post.id),
                   ),
                 ],
               ),

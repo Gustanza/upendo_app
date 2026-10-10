@@ -4,6 +4,7 @@ import '../models/poll_model.dart';
 import '../models/post_model.dart';
 import '../services/post_service.dart';
 import '../widgets/post_stats_row.dart';
+import '../widgets/unread_badge.dart';
 import 'post_detail_screen.dart';
 
 class CategoryPostsScreen extends StatefulWidget {
@@ -191,26 +192,36 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                 padding: const EdgeInsets.all(12),
                 child: Row(
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
-                      child: post.thumbnail.isNotEmpty
-                          ? Image.network(
-                              post.thumbnail,
-                              width: 100,
-                              height: 100,
-                              fit: BoxFit.cover,
-                            )
-                          : Container(
-                              width: 100,
-                              height: 100,
-                              color: Colors.grey[200],
-                              child: Icon(
-                                post.type == PollType.hostType
-                                    ? Icons.bar_chart_rounded
-                                    : Icons.image,
-                                color: Colors.grey,
-                              ),
-                            ),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(15),
+                          child: post.thumbnail.isNotEmpty
+                              ? Image.network(
+                                  post.thumbnail,
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                )
+                              : Container(
+                                  width: 100,
+                                  height: 100,
+                                  color: Colors.grey[200],
+                                  child: Icon(
+                                    post.type == PollType.hostType
+                                        ? Icons.bar_chart_rounded
+                                        : Icons.image,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                        ),
+                        Positioned(
+                          top: -6,
+                          right: -6,
+                          child: UnreadBadge(postId: post.id),
+                        ),
+                      ],
                     ),
                     const SizedBox(width: 15),
                     Expanded(

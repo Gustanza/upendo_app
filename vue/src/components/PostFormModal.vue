@@ -199,7 +199,7 @@
               </div>
             </div>
             <button
-              v-if="form.pollOptions.length < 6"
+              v-if="form.pollOptions.length < 15"
               type="button"
               class="btn-ghost poll-add-option"
               @click="form.pollOptions.push('')"

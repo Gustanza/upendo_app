@@ -126,7 +126,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           _buildMoyoLogo(),
           const SizedBox(height: 44),
           const Text(
-            'Karibu\nKatika Upendo App',
+            'Karibu\nKatika Moyo App',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,
@@ -157,7 +157,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Upendo App ni chanzo chako cha habari,\nmafunzo na msukumo wa kila siku.\nTunakuletea maudhui ya moyo wazi.',
+            'Moyo App ni chanzo chako cha habari,\nmafunzo na msukumo wa kila siku.\nTunakuletea maudhui ya moyo wazi.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.7),
           ),

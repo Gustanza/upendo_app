@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/attachment_model.dart';
 import '../models/conversation_model.dart';
 import '../models/message_model.dart';
 import '../models/poll_model.dart';
+import 'attachment_service.dart';
 
 class ConversationService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -89,17 +91,34 @@ class ConversationService {
         });
   }
 
-  Future<void> sendMessage(String conversationId, String text, {PollData? poll}) async {
+  // Attachments are uploaded to conversations/{id}/{messageId}/ before the
+  // message doc is written, so the recipient never sees a message whose
+  // files are still missing. Text may be empty when attachments are sent.
+  Future<void> sendMessage(
+    String conversationId,
+    String text, {
+    PollData? poll,
+    List<PendingAttachment> attachments = const [],
+    void Function(double progress)? onUploadProgress,
+  }) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty) return;
+    if (trimmed.isEmpty && attachments.isEmpty) return;
     final uid = FirebaseAuth.instance.currentUser!.uid;
-    await _messages(conversationId).add({
+    final docRef = _messages(conversationId).doc();
+    final uploaded = await AttachmentService().uploadAll(
+      'conversations/$conversationId/${docRef.id}',
+      attachments,
+      onProgress: onUploadProgress,
+    );
+    await docRef.set({
       'senderId': uid,
       'text': trimmed,
       'createdAt': FieldValue.serverTimestamp(),
       'type': poll != null ? PollType.hostType : 'text',
       'pollType': poll?.pollType,
       'pollOptions': poll?.options,
+      if (uploaded.isNotEmpty)
+        'attachments': uploaded.map((a) => a.toMap()).toList(),
     });
   }
 }

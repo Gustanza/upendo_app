@@ -45,7 +45,10 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.text is string
-        && request.resource.data.text.size() <= 500;
+        && request.resource.data.text.size() <= 1000
+        // Up to 5 images + 1 video (see ThreadComposeSheet).
+        && request.resource.data.get('attachments', []) is list
+        && request.resource.data.get('attachments', []).size() <= 6;
       // Author-only, and (like /posts) likeCount/commentCount stay
       // server-only even for the author — they're maintained by Cloud
       // Functions via the Admin SDK, which bypasses these rules.
@@ -62,7 +65,7 @@ service cloud.firestore {
           && request.resource.data.authorId == request.auth.uid
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 500;
+          && request.resource.data.text.size() <= 1000;
         allow update: if false;
         allow delete: if request.auth != null
           && resource.data.authorId == request.auth.uid;
@@ -121,8 +124,13 @@ service cloud.firestore {
           && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 500;
+          && request.resource.data.text.size() <= 500
+          // Up to 5 images, a video and PDFs (see ConversationScreen). Text
+          // may be empty only when the message carries attachments.
+          && request.resource.data.get('attachments', []) is list
+          && request.resource.data.get('attachments', []).size() <= 10
+          && (request.resource.data.text.size() > 0
+              || request.resource.data.get('attachments', []).size() > 0);
         // No editing or deleting messages — out of scope for this feature.
         allow update: if false;
         allow delete: if false;

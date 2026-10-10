@@ -5,6 +5,7 @@ import '../models/poll_model.dart';
 import '../models/thread_post_model.dart';
 import '../services/thread_post_service.dart';
 import '../utils/time_ago.dart';
+import '../widgets/attachment_views.dart';
 import '../widgets/poll_view.dart';
 import '../widgets/thread_stats_row.dart';
 import 'thread_compose_sheet.dart';
@@ -310,7 +311,10 @@ class _ChatFragmentState extends State<ChatFragment> {
                 style: const TextStyle(fontSize: 14, height: 1.4),
               ),
             ],
-            if (post.imageUrl != null) ...[
+            if (post.attachments.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              AttachmentsView(attachments: post.attachments),
+            ] else if (post.imageUrl != null) ...[
               const SizedBox(height: 10),
               ClipRRect(
                 borderRadius: BorderRadius.circular(14),

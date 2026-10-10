@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/poll_model.dart';
 
-const int _maxOptions = 6;
+const int _maxOptions = 15;
 
 // Plain mutable holder edited in place by PollComposerCard — not a
 // Firestore model. The host compose screen calls build() to know whether

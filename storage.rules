@@ -4,11 +4,26 @@ service firebase.storage {
   match /b/{bucket}/o {
     match /threadPosts/{postId}/{fileName} {
       allow read: if request.auth != null;
+      // Images (up to 5 per post), or one video of at most 10 minutes —
+      // duration is checked in the app, so the size cap here is generous.
       allow write: if request.auth != null
-        && request.resource.size < 8 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && ((request.resource.size < 8 * 1024 * 1024
+              && request.resource.contentType.matches('image/.*'))
+          || (request.resource.size < 2 * 1024 * 1024 * 1024
+              && request.resource.contentType.matches('video/.*')));
       // Deletes happen via the cleanupThreadPost Cloud Function (Admin SDK,
       // bypasses these rules) when the Firestore doc is deleted.
+      allow delete: if false;
+    }
+
+    // Private chat attachments — images, video and PDFs of any size — only
+    // readable/writable by the two conversation participants. Uses a
+    // cross-service Firestore lookup, which Firebase asks to authorise on
+    // the first deploy of these rules.
+    match /conversations/{conversationId}/{messageId}/{fileName} {
+      allow read, write: if request.auth != null
+        && request.auth.uid in firestore.get(
+             /databases/(default)/documents/conversations/$(conversationId)).data.participants;
       allow delete: if false;
     }
 

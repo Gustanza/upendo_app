@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 import '../services/user_preferences.dart';
 import 'profile_payment_screen.dart';
@@ -136,6 +137,9 @@ class _AccountFragmentState extends State<AccountFragment> {
 
     if (confirmed == true) {
       await FirebaseAuth.instance.signOut();
+      // Also clear the cached Google account so the account picker shows
+      // next time instead of silently reusing the previous account.
+      await GoogleSignIn.instance.signOut();
       await _userPreferences.clearUserData();
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(

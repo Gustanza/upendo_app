@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'attachment_model.dart';
 
 class ThreadPostModel {
   final String id;
@@ -13,6 +14,9 @@ class ThreadPostModel {
   final String type;
   final String? pollType;
   final List<String>? pollOptions;
+  // Images (up to 5) and/or a video. imageUrl above mirrors the first image
+  // so builds from before attachments existed still show something.
+  final List<Attachment> attachments;
 
   ThreadPostModel({
     required this.id,
@@ -26,6 +30,7 @@ class ThreadPostModel {
     this.type = 'text',
     this.pollType,
     this.pollOptions,
+    this.attachments = const [],
   });
 
   factory ThreadPostModel.fromFirestore(DocumentSnapshot doc) {
@@ -44,6 +49,7 @@ class ThreadPostModel {
       pollOptions: data['pollOptions'] is List
           ? (data['pollOptions'] as List).map((e) => e.toString()).toList()
           : null,
+      attachments: Attachment.listFrom(data['attachments']),
     );
   }
 }

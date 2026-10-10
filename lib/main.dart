@@ -1,11 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:upendo_app/views/home_dashboard.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:upendo_app/utils/start_screen.dart';
 import 'package:upendo_app/views/welcome_screen.dart';
-import 'package:upendo_app/views/profile_payment_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -20,6 +19,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // google_sign_in v7 must be initialised once before authenticate(). The
+  // serverClientId is the Firebase project's web OAuth client, needed on
+  // Android so the returned idToken is accepted by Firebase Auth.
+  await GoogleSignIn.instance.initialize(
+    serverClientId:
+        '630293487516-bvq0lru5161duniovg3po3blbev03hbg.apps.googleusercontent.com',
+  );
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await FirebaseMessaging.instance.requestPermission();
   // Wait for a valid FCM token before subscribing, avoiding the
@@ -74,41 +80,32 @@ void main() async {
   // }
   FirebaseAuth.instance.authStateChanges().listen((User? user) async {
     if (user == null) {
-      runApp(const NguvuYaUpendoApp(isSignedIn: false, isActive: false));
+      runApp(const NguvuYaUpendoApp(home: WelcomeScreen()));
     } else {
       // Fire-and-forget: re-register the current FCM token now that we have
       // a uid, so it gets attached to this user even if it was first
       // fetched before sign-in. Doesn't block/delay runApp() below.
       registerCurrentToken();
       try {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-        final bool isActive =
-            userDoc.exists && userDoc.data()?['isActive'] == true;
-        runApp(NguvuYaUpendoApp(isSignedIn: true, isActive: isActive));
+        // Same routing as sign-in: profile setup if details are missing,
+        // otherwise payment or home.
+        runApp(NguvuYaUpendoApp(home: await startScreenFor(user)));
       } catch (e) {
-        // In case of error, default to inactive/welcome
-        runApp(const NguvuYaUpendoApp(isSignedIn: false, isActive: false));
+        // In case of error, default to welcome
+        runApp(const NguvuYaUpendoApp(home: WelcomeScreen()));
       }
     }
   });
 }
 
 class NguvuYaUpendoApp extends StatelessWidget {
-  final bool isSignedIn;
-  final bool isActive;
-  const NguvuYaUpendoApp({
-    super.key,
-    required this.isSignedIn,
-    required this.isActive,
-  });
+  final Widget home;
+  const NguvuYaUpendoApp({super.key, required this.home});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Nguvu ya Upendo',
+      title: 'Moyo App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -133,9 +130,7 @@ class NguvuYaUpendoApp extends StatelessWidget {
           color: Colors.white,
         ),
       ),
-      home: isSignedIn
-          ? (isActive ? const HomeDashboard() : const ProfilePaymentScreen())
-          : const WelcomeScreen(),
+      home: home,
     );
   }
 }
