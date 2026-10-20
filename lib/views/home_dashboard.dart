@@ -698,8 +698,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(category.icon, color: Colors.white, size: 32),
-                    const SizedBox(height: 10),
                     Text(
                       category.name,
                       maxLines: 2,

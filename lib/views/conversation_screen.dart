@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -36,10 +38,16 @@ class _ConversationScreenState extends State<ConversationScreen> {
   double? _uploadProgress;
 
   static const _maxImages = 5;
+  // Matches firestore.rules' "attachments.size() <= 10" cap on
+  // /conversations/{id}/messages/{id} — without this, repeatedly adding
+  // PDFs on top of photos/video passes client-side but gets silently
+  // rejected by the security rule at send time.
+  static const _maxAttachments = 10;
 
   int _countOf(String type) => _pending.where((p) => p.type == type).length;
 
-  // Per message: up to 5 images, one video (any size), PDFs of any length.
+  // Per message: up to 5 images, one video (any size), PDFs of any length —
+  // all bounded by _maxAttachments combined.
   Future<void> _showAttachMenu() async {
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -70,9 +78,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
     if (choice == null || !mounted) return;
 
+    final totalRoom = _maxAttachments - _pending.length;
+    if (totalRoom <= 0) {
+      return _snack('Huwezi kuongeza viambatisho zaidi ya $_maxAttachments kwa ujumbe mmoja');
+    }
+
     switch (choice) {
       case Attachment.image:
-        final room = _maxImages - _countOf(Attachment.image);
+        final room = min(_maxImages - _countOf(Attachment.image), totalRoom);
         if (room <= 0) return _snack('Unaweza kutuma picha 5 tu kwa pamoja');
         final picked = await _attachmentService.pickImages(room);
         if (mounted) setState(() => _pending.addAll(picked));

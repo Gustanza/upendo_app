@@ -122,6 +122,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "630293487516-n63dset8velalu463svaph212bpnujdh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.moyoapp.tanzania",
+            "certificate_hash": "7c0a7fd065a8ede9e61a1bd70641582d1b5957a7"
+          }
+        },
+        {
           "client_id": "630293487516-bvq0lru5161duniovg3po3blbev03hbg.apps.googleusercontent.com",
           "client_type": 3
         }

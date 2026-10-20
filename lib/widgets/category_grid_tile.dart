@@ -76,13 +76,24 @@ class CategoryGridTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            category.name,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: Colors.black87,
+          // Expanded confines the label to whatever height the grid cell has
+          // left after the icon — without it, a long name wrapping to 2
+          // lines can be taller than the cell's fixed aspect-ratio height
+          // and overflow instead of truncating.
+          Expanded(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Text(
+                category.name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
             ),
           ),
         ],

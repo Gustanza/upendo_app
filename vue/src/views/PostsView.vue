@@ -73,6 +73,10 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 Edit
               </button>
+              <button class="action-btn delete" @click="confirmDelete(post)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                Delete
+              </button>
             </td>
           </tr>
         </tbody>
@@ -109,12 +113,26 @@
       @saved="onSaved"
     />
 
+    <!-- Delete confirmation -->
+    <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
+      <div class="confirm-modal">
+        <h3>Delete "{{ deleteTarget.title }}"?</h3>
+        <p>This will permanently remove the post. This can't be undone.</p>
+        <div class="confirm-actions">
+          <button class="btn-cancel" @click="deleteTarget = null">Cancel</button>
+          <button class="btn-confirm-delete" :disabled="deleting" @click="doDelete">
+            {{ deleting ? 'Deleting…' : 'Delete' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import { collection, getDocs, query, orderBy, where, startAfter, limit } from 'firebase/firestore'
+import { collection, getDocs, query, orderBy, where, startAfter, limit, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
 import PostDetailModal from '../components/PostDetailModal.vue'
 import PostFormModal   from '../components/PostFormModal.vue'
@@ -127,6 +145,8 @@ const error        = ref(null)
 const activeFilter = ref('all')
 const selectedPost = ref(null)
 const formPost     = ref(undefined)
+const deleteTarget = ref(null)
+const deleting     = ref(false)
 
 // Cursor stack: each entry is the Firestore DocumentSnapshot that starts that page.
 // Index 0 = null (page 1 needs no startAfter cursor).
@@ -207,6 +227,21 @@ function openCreate()    { formPost.value = null }
 function openEdit(post)  { formPost.value = post }
 function onSaved()       { resetPagination(); loadPage() }
 
+function confirmDelete(post) { deleteTarget.value = post }
+
+async function doDelete() {
+  if (!deleteTarget.value) return
+  deleting.value = true
+  try {
+    await deleteDoc(doc(db, 'posts', deleteTarget.value.id))
+    deleteTarget.value = null
+    resetPagination()
+    await loadPage()
+  } finally {
+    deleting.value = false
+  }
+}
+
 loadPage()
 </script>
 
@@ -247,7 +282,7 @@ loadPage()
 .clickable-row { cursor: pointer; }
 .clickable-row:hover .post-title { color: #3b4cca; }
 
-.actions-cell { width: 90px; text-align: right; }
+.actions-cell { width: 170px; text-align: right; white-space: nowrap; }
 .action-btn {
   display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px;
   border-radius: 6px; border: 1px solid; font-size: 12px; font-weight: 600;
@@ -255,6 +290,8 @@ loadPage()
 }
 .action-btn.edit { border-color: #dde0ee; background: #f8f9fc; color: #555; }
 .action-btn.edit:hover { border-color: #3b4cca; color: #3b4cca; background: #eef0fd; }
+.action-btn.delete { border-color: #fecaca; background: #fff; color: #dc2626; margin-left: 6px; }
+.action-btn.delete:hover { border-color: #fca5a5; background: #fee2e2; }
 
 .thumb { width: 56px; height: 40px; object-fit: cover; border-radius: 6px; display: block; }
 .thumb-placeholder {
@@ -317,4 +354,28 @@ loadPage()
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .empty { text-align: center; padding: 48px; color: #9ca3af; }
+
+/* Delete confirmation */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.confirm-modal {
+  background: #fff; border-radius: 14px; padding: 28px; width: 420px;
+  max-width: calc(100vw - 32px); box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.confirm-modal h3 { margin: 0 0 10px; font-size: 17px; color: #1a1d2e; }
+.confirm-modal p  { margin: 0 0 22px; font-size: 14px; color: #6b7280; line-height: 1.5; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.btn-cancel {
+  padding: 9px 18px; border: 1.5px solid #e5e7eb; border-radius: 8px; background: #fff;
+  font-size: 14px; font-weight: 500; color: #374151; cursor: pointer;
+}
+.btn-cancel:hover { background: #f3f4f6; }
+.btn-confirm-delete {
+  padding: 9px 18px; border: none; border-radius: 8px; background: #dc2626; color: #fff;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.btn-confirm-delete:hover:not(:disabled) { background: #b91c1c; }
+.btn-confirm-delete:disabled { opacity: .5; cursor: not-allowed; }
 </style>
