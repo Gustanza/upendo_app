@@ -1,0 +1,90 @@
+/* Shared look for the newer dashboard pages (Category Groups, User Groups,
+   Withdrawals) — same visual language as the older pages' scoped styles,
+   but kept in one place. Everything is nested under .admin-page so it
+   can't leak into the existing views. */
+
+.admin-page { display: flex; flex-direction: column; gap: 20px; }
+
+.admin-page .page-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.admin-page .subtitle { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
+.admin-page .hint { font-size: 12px; color: #6b7280; margin: 0; }
+
+.admin-page .btn-primary {
+  padding: 10px 20px; background: #8b2942; color: #fff; border: none; border-radius: 9px;
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s;
+}
+.admin-page .btn-primary:hover:not(:disabled) { background: #6e1f33; }
+.admin-page .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+.admin-page .btn-sm {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 7px;
+  font-size: 13px; font-weight: 500; cursor: pointer; border: 1.5px solid #e5e7eb; background: #fff; color: #374151;
+}
+.admin-page .btn-sm:hover:not(:disabled) { background: #f3f4f6; }
+.admin-page .btn-sm:disabled { opacity: .5; cursor: not-allowed; }
+.admin-page .btn-sm.danger { border-color: #fecaca; color: #dc2626; }
+.admin-page .btn-sm.danger:hover:not(:disabled) { background: #fee2e2; }
+.admin-page .btn-sm.success { border-color: #a7f3d0; color: #047857; }
+.admin-page .btn-sm.success:hover:not(:disabled) { background: #d1fae5; }
+
+.admin-page .empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 60px 0;
+  color: #9ca3af; font-size: 14px; text-align: center;
+}
+.admin-page .error-banner { font-size: 13px; color: #c81e1e; background: #fde8e8; padding: 10px 14px; border-radius: 8px; }
+
+.admin-page .table-card { background: #fff; border-radius: 12px; border: 1px solid #e8eaf0; overflow: auto; }
+.admin-page table { width: 100%; border-collapse: collapse; }
+.admin-page thead tr { background: #f8f9fc; border-bottom: 1px solid #e8eaf0; }
+.admin-page th {
+  padding: 12px 16px; font-size: 11px; font-weight: 700; color: #6b7280;
+  text-transform: uppercase; letter-spacing: .6px; text-align: left; white-space: nowrap;
+}
+.admin-page td { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; font-size: 14px; color: #1a1d2e; }
+.admin-page tbody tr:last-child td { border-bottom: none; }
+.admin-page tbody tr:hover { background: #fafbff; }
+.admin-page .muted { color: #6b7280; font-size: 13px; }
+.admin-page .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.admin-page .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.admin-page .icon-badge { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.admin-page .icon-badge .mi { color: #fff; font-size: 22px; }
+.admin-page .avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #f3e3e7; color: #8b2942; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+
+.admin-page .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.admin-page .badge.pending { background: #fef3c7; color: #b45309; }
+.admin-page .badge.paid { background: #d1fae5; color: #047857; }
+.admin-page .badge.rejected { background: #fee2e2; color: #b91c1c; }
+
+.admin-page .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.admin-page .tab { padding: 7px 14px; border-radius: 8px; border: 1.5px solid #e5e7eb; background: #fff; font-size: 13px; font-weight: 600; color: #374151; cursor: pointer; }
+.admin-page .tab.active { background: #8b2942; border-color: #8b2942; color: #fff; }
+
+.admin-page .search-input, .admin-page .text-input, .admin-page select.text-input, .admin-page textarea.text-input {
+  border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; font-size: 14px; outline: none;
+  color: #1a1d2e; box-sizing: border-box; background: #fff; font-family: inherit;
+}
+.admin-page .text-input { width: 100%; }
+.admin-page .search-input:focus, .admin-page .text-input:focus { border-color: #8b2942; }
+
+/* Modals */
+.admin-page .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.admin-page .modal {
+  background: #fff; border-radius: 14px; width: 620px; max-width: calc(100vw - 32px); max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.admin-page .modal.wide { width: 860px; }
+.admin-page .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px 14px; border-bottom: 1px solid #e8eaf0; gap: 12px; }
+.admin-page .modal-header h2 { margin: 0; font-size: 17px; font-weight: 700; color: #1a1d2e; }
+.admin-page .modal-body { padding: 18px 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 16px; }
+.admin-page .modal-footer { padding: 14px 24px; border-top: 1px solid #e8eaf0; display: flex; justify-content: flex-end; gap: 10px; }
+.admin-page .close-btn { width: 32px; height: 32px; border: none; background: none; cursor: pointer; border-radius: 8px; color: #6b7280; font-size: 20px; }
+.admin-page .close-btn:hover { background: #f3f4f6; }
+.admin-page .field { display: flex; flex-direction: column; gap: 6px; }
+.admin-page .field > label { font-size: 13px; font-weight: 600; color: #374151; }
+.admin-page .btn-cancel { padding: 9px 18px; border: 1.5px solid #e5e7eb; border-radius: 8px; background: #fff; font-size: 14px; font-weight: 500; color: #374151; cursor: pointer; }
+.admin-page .btn-cancel:hover { background: #f3f4f6; }
+.admin-page .btn-danger { padding: 9px 18px; border: none; border-radius: 8px; background: #dc2626; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+.admin-page .btn-danger:disabled { opacity: .5; cursor: not-allowed; }
+
+.admin-page .mi { font-family: 'Material Icons'; font-style: normal; font-weight: normal; line-height: 1; display: inline-block; }

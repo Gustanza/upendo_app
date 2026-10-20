@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:upendo_app/l10n/l10n.dart';
 import 'package:upendo_app/utils/contact_actions.dart';
 import 'package:upendo_app/views/home_dashboard.dart';
 
@@ -79,7 +80,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Imeshindwa kupakua vifurushi. Jaribu tena.';
+        _errorMessage = context.l10n.paymentLoadPackagesFailed;
         _state = _PaymentState.selectPackage;
       });
     }
@@ -120,7 +121,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
         if (!mounted) return;
         setState(() {
           _state = _PaymentState.enterPhone;
-          _errorMessage = (err as Map)['message']?.toString() ?? 'Hitilafu imetokea.';
+          _errorMessage = (err as Map)['message']?.toString() ?? context.l10n.errorOccurred;
         });
         return;
       }
@@ -137,7 +138,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
       if (!mounted) return;
       setState(() {
         _state = _PaymentState.enterPhone;
-        _errorMessage = 'Hitilafu imetokea. Angalia mtandao na ujaribu tena.';
+        _errorMessage = context.l10n.errorCheckNetwork;
       });
     }
   }
@@ -172,11 +173,17 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
         .snapshots()
         .listen((snap) {
           if (!mounted) return;
-          if (snap.data()?['status'] == 'Failed') {
+          final status = snap.data()?['status'];
+          // 'Underpaid': the provider confirmed a payment smaller than the
+          // package price, so the server didn't activate the subscription.
+          if (status == 'Failed' || status == 'Underpaid') {
             _userSub?.cancel();
             _subscriptionSub?.cancel();
             setState(() {
-              _errorMessage = snap.data()?['message']?.toString() ?? 'Malipo hayakufanikiwa.';
+              _errorMessage = status == 'Underpaid'
+                  ? context.l10n.paymentUnderpaid
+                  : snap.data()?['message']?.toString() ??
+                      context.l10n.paymentFailedMessage;
               _state = _PaymentState.failed;
             });
           }
@@ -200,7 +207,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
         MaterialPageRoute(builder: (_) => const HomeDashboard()),
       );
     } else {
-      setState(() => _errorMessage = 'Malipo bado hayajathibitishwa. Subiri kidogo.');
+      setState(() => _errorMessage = context.l10n.paymentNotConfirmedYet);
     }
   }
 
@@ -291,10 +298,10 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
-          const Text(
-            'Unahitaji msaada wa malipo? Wasiliana nasi',
+          Text(
+            context.l10n.paymentSupportPrompt,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 12),
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -367,20 +374,20 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                 ),
               ),
             ),
-          const Text(
-            'Thibitisha namba ya simu utakayolipia',
+          Text(
+            context.l10n.paymentConfirmPhone,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Utapokea ujumbe wa kuweka PIN kwenye namba hii',
+          Text(
+            context.l10n.paymentPinPrompt,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 12),
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 16),
 
@@ -422,9 +429,9 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                 disabledBackgroundColor: Colors.white24,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text(
-                'LIPIA SASA',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              child: Text(
+                context.l10n.payNow,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
           ),
@@ -432,9 +439,9 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
 
           TextButton(
             onPressed: _goBackToSelection,
-            child: const Text(
-              'Rudi nyuma',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
+            child: Text(
+              context.l10n.goBack,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
           ),
         ],
@@ -445,16 +452,16 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
   // ── State: calling subscribe function ────────────────────────
 
   Widget _buildInitiating() {
-    return const Padding(
-      key: ValueKey('initiating'),
-      padding: EdgeInsets.symmetric(vertical: 50),
+    return Padding(
+      key: const ValueKey('initiating'),
+      padding: const EdgeInsets.symmetric(vertical: 50),
       child: Column(
         children: [
-          CircularProgressIndicator(color: Colors.white),
-          SizedBox(height: 16),
+          const CircularProgressIndicator(color: Colors.white),
+          const SizedBox(height: 16),
           Text(
-            'Inaandaa malipo…',
-            style: TextStyle(color: Colors.white, fontSize: 15),
+            context.l10n.paymentPreparing,
+            style: const TextStyle(color: Colors.white, fontSize: 15),
           ),
         ],
       ),
@@ -480,10 +487,10 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
               children: [
                 const Icon(Icons.phonelink_ring_rounded, color: Colors.white, size: 44),
                 const SizedBox(height: 14),
-                const Text(
-                  'Angalia simu yako',
+                Text(
+                  context.l10n.paymentCheckPhone,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -491,7 +498,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Tumetuma ombi la malipo kwenye simu yako. Weka PIN yako kukamilisha malipo. Programu itafunguka moja kwa moja baada ya malipo kukubaliwa.',
+                  context.l10n.paymentWaitingBody,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white.withAlpha(217),
@@ -530,9 +537,9 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                 foregroundColor: const Color(0xFF00008B),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text(
-                'Nimemaliza malipo',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              child: Text(
+                context.l10n.paymentDone,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
           ),
@@ -540,9 +547,9 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
 
           TextButton(
             onPressed: _goBackToSelection,
-            child: const Text(
-              'Rudi nyuma',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
+            child: Text(
+              context.l10n.goBack,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
           ),
         ],
@@ -569,10 +576,10 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
               children: [
                 const Icon(Icons.error_outline_rounded, color: Colors.orangeAccent, size: 44),
                 const SizedBox(height: 14),
-                const Text(
-                  'Malipo hayakufanikiwa',
+                Text(
+                  context.l10n.paymentFailedTitle,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -580,7 +587,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _errorMessage ?? 'Jaribu tena.',
+                  _errorMessage ?? context.l10n.tryAgain,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white.withAlpha(217),
@@ -603,9 +610,9 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                 foregroundColor: const Color(0xFF00008B),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text(
-                'JARIBU TENA',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              child: Text(
+                context.l10n.tryAgainButton,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
           ),
@@ -643,16 +650,16 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                 color: Colors.white.withAlpha(38),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'Hakuna vifurushi vya usajili kwa sasa.\nTafadhali wasiliana na msimamizi.',
+              child: Text(
+                context.l10n.paymentNoPackages,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+                style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
               ),
             )
           else ...[
-            const Text(
-              'Chagua kifurushi cha usajili',
-              style: TextStyle(
+            Text(
+              context.l10n.paymentChoosePackage,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -670,8 +677,9 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                   onPressed: () => setState(() => _showAllPackages = !_showAllPackages),
                   child: Text(
                     _showAllPackages
-                        ? 'Onyesha vichache'
-                        : 'Ona vifurushi vingine (${_packages.length - _collapsedPackageCount})',
+                        ? context.l10n.showFewer
+                        : context.l10n.paymentShowMorePackages(
+                            _packages.length - _collapsedPackageCount),
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -694,9 +702,9 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                   disabledBackgroundColor: Colors.white24,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text(
-                  'ENDELEA',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                child: Text(
+                  context.l10n.continueButton,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ),
             ),
@@ -787,7 +795,7 @@ class _ProfilePaymentScreenState extends State<ProfilePaymentScreen> {
                   ),
                 ),
                 Text(
-                  '$days siku',
+                  context.l10n.daysCount(days),
                   style: TextStyle(
                     fontSize: 11,
                     color: isSelected ? Colors.grey[600] : Colors.white70,

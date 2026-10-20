@@ -227,7 +227,7 @@ onUnmounted(() => unsub?.())
 
 .btn-primary {
   padding: 10px 20px;
-  background: #3b4cca;
+  background: #8b2942;
   color: #fff;
   border: none;
   border-radius: 9px;
@@ -236,7 +236,7 @@ onUnmounted(() => unsub?.())
   cursor: pointer;
   transition: background .15s;
 }
-.btn-primary:hover { background: #2f3da0; }
+.btn-primary:hover { background: #6e1f33; }
 
 .empty-state {
   display: flex;
@@ -291,16 +291,16 @@ onUnmounted(() => unsub?.())
 .btn-send {
   padding: 6px 14px;
   border-radius: 7px;
-  border: 1.5px solid #3b4cca;
-  background: #eef0fb;
-  color: #3b4cca;
+  border: 1.5px solid #8b2942;
+  background: #f8eaed;
+  color: #8b2942;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: all .12s;
 }
-.btn-send:hover:not(:disabled) { background: #3b4cca; color: #fff; }
+.btn-send:hover:not(:disabled) { background: #8b2942; color: #fff; }
 .btn-send:disabled { opacity: .5; cursor: not-allowed; }
 
 .btn-delete {
@@ -397,7 +397,7 @@ onUnmounted(() => unsub?.())
   width: 100%;
   box-sizing: border-box;
 }
-.text-input:focus { border-color: #3b4cca; }
+.text-input:focus { border-color: #8b2942; }
 .textarea { resize: vertical; min-height: 80px; }
 
 .modal-footer {
@@ -422,10 +422,10 @@ onUnmounted(() => unsub?.())
 
 .btn-draft {
   padding: 9px 18px;
-  border: 1.5px solid #3b4cca;
+  border: 1.5px solid #8b2942;
   border-radius: 8px;
-  background: #eef0fb;
-  color: #3b4cca;
+  background: #f8eaed;
+  color: #8b2942;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -438,14 +438,14 @@ onUnmounted(() => unsub?.())
   padding: 9px 22px;
   border: none;
   border-radius: 8px;
-  background: #3b4cca;
+  background: #8b2942;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: background .15s;
 }
-.btn-publish:hover:not(:disabled) { background: #2f3da0; }
+.btn-publish:hover:not(:disabled) { background: #6e1f33; }
 .btn-publish:disabled { opacity: .5; cursor: not-allowed; }
 
 .btn-confirm-delete {

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 import '../models/category_model.dart';
 
 class CategoryPasswordDialog extends StatefulWidget {
@@ -54,9 +55,9 @@ class _CategoryPasswordDialogState extends State<CategoryPasswordDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'This category is protected. Enter the password to continue.',
-            style: TextStyle(fontSize: 13, color: Colors.black54),
+          Text(
+            context.l10n.categoryPasswordPrompt,
+            style: const TextStyle(fontSize: 13, color: Colors.black54),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -68,8 +69,8 @@ class _CategoryPasswordDialogState extends State<CategoryPasswordDialog> {
               if (_wrong) setState(() => _wrong = false);
             },
             decoration: InputDecoration(
-              hintText: 'Password',
-              errorText: _wrong ? 'Incorrect password' : null,
+              hintText: context.l10n.password,
+              errorText: _wrong ? context.l10n.incorrectPassword : null,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -84,12 +85,12 @@ class _CategoryPasswordDialogState extends State<CategoryPasswordDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.cancel),
         ),
         FilledButton(
           onPressed: _submit,
           style: FilledButton.styleFrom(backgroundColor: widget.category.color),
-          child: const Text('Unlock'),
+          child: Text(context.l10n.unlock),
         ),
       ],
     );

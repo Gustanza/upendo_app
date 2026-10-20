@@ -22,10 +22,30 @@ class AttachmentService {
     return Future.wait(files.take(limit).map((f) => _pending(Attachment.image, f.path, f.name)));
   }
 
+  /// One photo from the camera (e.g. an ID document), or null.
+  Future<PendingAttachment?> takePhoto() async {
+    final file = await _picker.pickImage(
+        source: ImageSource.camera, imageQuality: 85, maxWidth: 2000);
+    if (file == null) return null;
+    return _pending(Attachment.image, file.path, file.name);
+  }
+
   Future<PendingAttachment?> pickVideo() async {
     final file = await _picker.pickVideo(source: ImageSource.gallery);
     if (file == null) return null;
     return _pending(Attachment.video, file.path, file.name);
+  }
+
+  Future<PendingAttachment?> pickAudio() async {
+    final result = await FilePicker.pickFiles(type: FileType.audio);
+    final file = result?.files.single;
+    if (file?.path == null) return null;
+    return PendingAttachment(
+      type: Attachment.audio,
+      localPath: file!.path!,
+      name: file.name,
+      size: file.size,
+    );
   }
 
   Future<PendingAttachment?> pickPdf() async {
@@ -116,6 +136,16 @@ class AttachmentService {
     switch (item.type) {
       case Attachment.pdf:
         return 'application/pdf';
+      case Attachment.audio:
+        return switch (ext) {
+          'm4a' || 'mp4' => 'audio/mp4',
+          'aac' => 'audio/aac',
+          'wav' => 'audio/wav',
+          'ogg' || 'opus' => 'audio/ogg',
+          'amr' => 'audio/amr',
+          'flac' => 'audio/flac',
+          _ => 'audio/mpeg',
+        };
       case Attachment.video:
         return switch (ext) {
           'mov' => 'video/quicktime',

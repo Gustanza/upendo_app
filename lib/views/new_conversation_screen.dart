@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../l10n/l10n.dart';
 import '../models/user_model.dart';
 import '../services/conversation_service.dart';
 import '../services/user_service.dart';
@@ -69,7 +70,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
     } catch (e) {
       if (!mounted || requestId != _searchRequestId) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Imeshindwa kutafuta: $e')));
+          .showSnackBar(SnackBar(content: Text(context.l10n.searchFailed('$e'))));
     } finally {
       if (mounted && requestId == _searchRequestId) {
         setState(() => _isSearching = false);
@@ -95,7 +96,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Imeshindwa kufungua mazungumzo: $e')),
+          SnackBar(content: Text(context.l10n.openConversationFailed('$e'))),
         );
       }
     }
@@ -106,7 +107,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
       appBar: AppBar(
-        title: const Text('Ujumbe Mpya'),
+        title: Text(context.l10n.newMessage),
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1A1D2E),
         elevation: 0,
@@ -125,7 +126,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
               autofocus: true,
               onChanged: _onQueryChanged,
               decoration: InputDecoration(
-                hintText: 'Tafuta jina la mtumiaji...',
+                hintText: context.l10n.searchUserHint,
                 prefixIcon: const Icon(Icons.search, color: Color(0xFF9CA3AF)),
                 filled: true,
                 fillColor: Colors.white,
@@ -146,10 +147,10 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
 
   Widget _buildBody() {
     if (!_hasSearched && !_isSearching) {
-      return const Center(
+      return Center(
         child: Text(
-          'Andika jina la mtu unayetaka kumtumia ujumbe',
-          style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+          context.l10n.newMessagePrompt,
+          style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
         ),
       );
     }
@@ -159,10 +160,10 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
     }
 
     if (_results.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'Hakuna mtumiaji aliyepatikana.',
-          style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
+          context.l10n.noUserFound,
+          style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
         ),
       );
     }

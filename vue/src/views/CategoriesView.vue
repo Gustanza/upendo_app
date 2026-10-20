@@ -24,6 +24,7 @@
             <th>Icon</th>
             <th>Name</th>
             <th>Parent</th>
+            <th>Group</th>
             <th>Color</th>
             <th></th>
           </tr>
@@ -40,6 +41,7 @@
               <span v-if="cat.isProtected" class="lock-badge mi" title="Password protected">lock</span>
             </td>
             <td class="cat-parent">{{ parentName(cat) }}</td>
+            <td class="cat-parent">{{ groupName(cat) }}</td>
             <td>
               <span class="color-dot" :style="{ background: cssColor(cat.colorHex) }"></span>
             </td>
@@ -109,6 +111,7 @@
       v-if="showModal"
       :category="editingCategory"
       :categories="categories"
+      :groups="groups"
       @close="showModal = false"
       @saved="onSaved"
     />
@@ -124,6 +127,7 @@ import CategoryFormModal from '../components/CategoryFormModal.vue'
 
 const PAGE_SIZE       = 5
 const categories      = ref([])
+const groups          = ref([])
 const loading         = ref(true)
 const currentPage     = ref(1)
 const showModal       = ref(false)
@@ -140,6 +144,7 @@ const paginated  = computed(() =>
 watch(totalPages, (tp) => { if (currentPage.value > tp) currentPage.value = tp })
 
 let unsub = null
+let unsubGroups = null
 
 onMounted(() => {
   unsub = onSnapshot(collection(db, 'categories'), snap => {
@@ -155,9 +160,16 @@ onMounted(() => {
     })
     loading.value = false
   })
+  // Category groups (top level) — for the Group column and the form's
+  // group select. Fails quietly if the new rules aren't deployed yet.
+  unsubGroups = onSnapshot(collection(db, 'categoryGroups'), snap => {
+    groups.value = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.name || '').localeCompare(b.name || ''))
+  }, () => { groups.value = [] })
 })
 
-onUnmounted(() => unsub?.())
+onUnmounted(() => { unsub?.(); unsubGroups?.() })
 
 function cssColor(hex) { return flutterColorToCss(hex) }
 
@@ -165,6 +177,13 @@ function parentName(cat) {
   if (!cat.parentId) return '—'
   const parent = categories.value.find(c => c.id === cat.parentId)
   return parent ? parent.name : '—'
+}
+
+// Subcategories show their parent's group (they inherit its place).
+function groupName(cat) {
+  const main = cat.parentId ? categories.value.find(c => c.id === cat.parentId) : cat
+  if (!main?.groupId) return '—'
+  return groups.value.find(g => g.id === main.groupId)?.name ?? '—'
 }
 
 function childrenOf(cat) {
@@ -228,7 +247,7 @@ function onSaved() {
 
 .btn-primary {
   padding: 10px 20px;
-  background: #3b4cca;
+  background: #8b2942;
   color: #fff;
   border: none;
   border-radius: 9px;
@@ -237,7 +256,7 @@ function onSaved() {
   cursor: pointer;
   transition: background .15s;
 }
-.btn-primary:hover { background: #2f3da0; }
+.btn-primary:hover { background: #6e1f33; }
 
 .empty-state {
   display: flex;
@@ -379,7 +398,7 @@ function onSaved() {
   cursor: pointer;
   transition: all .12s;
 }
-.page-btn:hover:not(:disabled) { border-color: #3b4cca; color: #3b4cca; }
+.page-btn:hover:not(:disabled) { border-color: #8b2942; color: #8b2942; }
 .page-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* Delete confirmation modal */

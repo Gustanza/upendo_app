@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/attachment_model.dart';
+import '../models/chat_channel.dart';
 import '../models/conversation_model.dart';
 import '../models/message_model.dart';
 import '../models/poll_model.dart';
+import '../utils/chat_visibility.dart';
 import 'attachment_service.dart';
 
 class ConversationService {
@@ -11,9 +13,6 @@ class ConversationService {
 
   CollectionReference<Map<String, dynamic>> get _conversations =>
       _db.collection('conversations');
-
-  CollectionReference<Map<String, dynamic>> _messages(String conversationId) =>
-      _conversations.doc(conversationId).collection('messages');
 
   // Matches firestore.rules' create check: the two uids sorted
   // lexicographically and joined with '_', so the doc id alone proves who
@@ -38,7 +37,7 @@ class ConversationService {
     final snap = await ref.get();
     if (!snap.exists) {
       final myDoc = await _db.collection('users').doc(uid).get();
-      final myName = (myDoc.data()?['fullName'] as String?) ?? 'Mtumiaji';
+      final myName = (myDoc.data()?['fullName'] as String?) ?? '';
       await ref.set({
         'participants': [uid, otherUid]..sort(),
         'participantNames': {uid: myName, otherUid: otherName},
@@ -51,7 +50,8 @@ class ConversationService {
 
   // Unpaginated: a user's own conversation list is bounded by how many
   // people they've messaged, not a global feed — same tradeoff as
-  // PostInteractionService.getComments.
+  // PostInteractionService.getComments. Conversations this user deleted
+  // "for me" are dropped until a newer message brings them back.
   Stream<List<ConversationModel>> getConversations() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return Stream.value(const []);
@@ -59,12 +59,39 @@ class ConversationService {
         .where('participants', arrayContains: uid)
         .orderBy('updatedAt', descending: true)
         .snapshots()
-        .map((snap) =>
-            snap.docs.map((d) => ConversationModel.fromFirestore(d)).toList());
+        .map((snap) => snap.docs
+            .map((d) => ConversationModel.fromFirestore(d))
+            .where((c) => c.isVisibleTo(uid))
+            .toList());
   }
 
-  Stream<List<MessageModel>> getMessages(String conversationId) {
-    return _messages(conversationId)
+  /// "Delete chat" — hides the conversation and its current messages for
+  /// the signed-in user only (see chat_visibility.dart). firestore.rules
+  /// allows a participant to write exactly this one field.
+  Future<void> deleteConversationForMe(String conversationId) {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    return _conversations.doc(conversationId).update({
+      'deletedAt.$uid': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Stream<List<MessageModel>> getMessages(String conversationId) =>
+      watchMessages(ChatChannel.conversation(conversationId));
+
+  /// Live, oldest-first messages of any chat. For a private conversation
+  /// the signed-in user previously deleted, messages up to that moment are
+  /// filtered out.
+  Stream<List<MessageModel>> watchMessages(ChatChannel channel) async* {
+    DateTime? deletedAt;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (channel.conversationId != null && uid != null) {
+      final snap = await _conversations.doc(channel.conversationId).get();
+      if (snap.exists) {
+        deletedAt = ConversationModel.fromFirestore(snap).deletedAtFor(uid);
+      }
+    }
+    yield* _db
+        .collection(channel.messagesPath)
         .orderBy('createdAt')
         .snapshots()
         .map((snap) {
@@ -75,10 +102,10 @@ class ConversationService {
           // until its FieldValue.serverTimestamp() resolves — Firestore's
           // orderBy('createdAt') sorts null first (oldest), which briefly
           // flashes a just-sent message to the wrong end of the reversed
-          // chat list in conversation_screen.dart. Re-sort here treating a
-          // pending (null) createdAt as "now" so it renders as the most
-          // recent message immediately, then settles into the same spot
-          // once the real timestamp arrives.
+          // chat list in ChatRoomView. Re-sort here treating a pending
+          // (null) createdAt as "now" so it renders as the most recent
+          // message immediately, then settles into the same spot once the
+          // real timestamp arrives.
           messages.sort((a, b) {
             final aMs = a.createdAt?.millisecondsSinceEpoch;
             final bMs = b.createdAt?.millisecondsSinceEpoch;
@@ -87,15 +114,30 @@ class ConversationService {
             if (bMs == null) return -1;
             return aMs.compareTo(bMs);
           });
-          return messages;
+          return visibleSince(messages, deletedAt, (m) => m.createdAt);
         });
   }
 
-  // Attachments are uploaded to conversations/{id}/{messageId}/ before the
-  // message doc is written, so the recipient never sees a message whose
-  // files are still missing. Text may be empty when attachments are sent.
   Future<void> sendMessage(
     String conversationId,
+    String text, {
+    PollData? poll,
+    List<PendingAttachment> attachments = const [],
+    void Function(double progress)? onUploadProgress,
+  }) =>
+      sendTo(
+        ChatChannel.conversation(conversationId),
+        text,
+        poll: poll,
+        attachments: attachments,
+        onUploadProgress: onUploadProgress,
+      );
+
+  // Attachments are uploaded to the channel's storage folder before the
+  // message doc is written, so the recipient never sees a message whose
+  // files are still missing. Text may be empty when attachments are sent.
+  Future<void> sendTo(
+    ChatChannel channel,
     String text, {
     PollData? poll,
     List<PendingAttachment> attachments = const [],
@@ -104,14 +146,20 @@ class ConversationService {
     final trimmed = text.trim();
     if (trimmed.isEmpty && attachments.isEmpty) return;
     final uid = FirebaseAuth.instance.currentUser!.uid;
-    final docRef = _messages(conversationId).doc();
+    final docRef = _db.collection(channel.messagesPath).doc();
+    String? senderName;
+    if (channel.showSenderNames) {
+      final myDoc = await _db.collection('users').doc(uid).get();
+      senderName = (myDoc.data()?['fullName'] as String?) ?? '';
+    }
     final uploaded = await AttachmentService().uploadAll(
-      'conversations/$conversationId/${docRef.id}',
+      channel.storageFolder(docRef.id),
       attachments,
       onProgress: onUploadProgress,
     );
     await docRef.set({
       'senderId': uid,
+      'senderName': ?senderName,
       'text': trimmed,
       'createdAt': FieldValue.serverTimestamp(),
       'type': poll != null ? PollType.hostType : 'text',
@@ -121,4 +169,10 @@ class ConversationService {
         'attachments': uploaded.map((a) => a.toMap()).toList(),
     });
   }
+
+  /// Room messages only (ChatChannel.allowDeletingMessages) — firestore.rules
+  /// lets the sender, the group owner or an admin delete; attachments are
+  /// removed by the cleanupRoomMessage Cloud Function.
+  Future<void> deleteMessage(ChatChannel channel, String messageId) =>
+      _db.collection(channel.messagesPath).doc(messageId).delete();
 }

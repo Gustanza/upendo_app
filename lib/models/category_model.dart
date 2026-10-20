@@ -7,10 +7,14 @@ class Category {
   final int colorHex;
   final bool isProtected;
   final String? passwordHash;
-  // null/absent = top-level category. One level of nesting only — a
-  // category referenced as someone's parentId is never itself expected to
+  // null/absent = top-level ("main") category. One level of nesting only —
+  // a category referenced as someone's parentId is never itself expected to
   // have a parentId (enforced by the admin form, not by this model).
   final String? parentId;
+  // Main categories only: the categoryGroups/{id} this main category is
+  // listed under. null/absent (every pre-existing category) = ungrouped,
+  // shown directly on Explore/Home as before — see category_tree.dart.
+  final String? groupId;
 
   Category({
     required this.id,
@@ -20,6 +24,7 @@ class Category {
     this.isProtected = false,
     this.passwordHash,
     this.parentId,
+    this.groupId,
   });
 
   factory Category.fromFirestore(String id, Map<String, dynamic> data) {
@@ -31,6 +36,7 @@ class Category {
       isProtected: data['isProtected'] ?? false,
       passwordHash: data['passwordHash'],
       parentId: data['parentId'] as String?,
+      groupId: data['groupId'] as String?,
     );
   }
 
@@ -42,6 +48,7 @@ class Category {
       'isProtected': isProtected,
       if (passwordHash != null) 'passwordHash': passwordHash,
       if (parentId != null) 'parentId': parentId,
+      if (groupId != null) 'groupId': groupId,
     };
   }
 
@@ -86,6 +93,12 @@ class Category {
     0xe54e: Icons.hotel,
   };
 
-  IconData get icon => _supportedIcons[iconCode] ?? Icons.folder;
+  /// Flutter icon for a web Material Icons codepoint stored by the admin
+  /// (shared with CategoryGroup).
+  static IconData iconFor(int code) => _supportedIcons[code] ?? Icons.folder;
+
+  bool get isMain => parentId == null;
+
+  IconData get icon => iconFor(iconCode);
   Color get color => Color(colorHex);
 }

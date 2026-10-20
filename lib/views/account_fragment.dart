@@ -2,9 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:intl/intl.dart';
+import '../l10n/l10n.dart';
 import '../models/user_model.dart';
+import '../services/locale_controller.dart';
 import '../services/user_preferences.dart';
+import '../widgets/referral_code_card.dart';
 import 'profile_payment_screen.dart';
+import 'wallet_screen.dart';
 import 'welcome_screen.dart';
 
 class AccountFragment extends StatefulWidget {
@@ -98,13 +103,10 @@ class _AccountFragmentState extends State<AccountFragment> {
     return const Color(0xFF10B981);
   }
 
-  String _formatDate(DateTime date) {
-    const months = [
-      'Januari', 'Februari', 'Machi', 'Aprili', 'Mei', 'Juni',
-      'Julai', 'Agosti', 'Septemba', 'Oktoba', 'Novemba', 'Desemba',
-    ];
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
-  }
+  // Month names follow the selected UI language (date symbols are loaded
+  // by GlobalMaterialLocalizations for every supported locale).
+  String _formatDate(DateTime date) =>
+      DateFormat.yMMMMd(Localizations.localeOf(context).toString()).format(date);
 
   String _initials(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
@@ -119,17 +121,18 @@ class _AccountFragmentState extends State<AccountFragment> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Toka?', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: const Text('Je, una uhakika unataka kutoka kwenye akaunti?'),
+        title: Text(context.l10n.logoutConfirmTitle,
+            style: const TextStyle(fontWeight: FontWeight.w700)),
+        content: Text(context.l10n.logoutConfirmBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hapana'),
+            child: Text(context.l10n.no),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Ndiyo, Toka',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
+            child: Text(context.l10n.yesLogout,
+                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -174,21 +177,38 @@ class _AccountFragmentState extends State<AccountFragment> {
                 children: [
                   _buildSubscriptionCard(),
                   const SizedBox(height: 20),
+                  const ReferralCodeCard(),
+                  const SizedBox(height: 12),
+                  _buildActionTile(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: context.l10n.walletTitle,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const WalletScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildActionTile(
+                    icon: Icons.translate_rounded,
+                    label: context.l10n.language,
+                    value: _languageName(LocaleController.instance.locale.languageCode),
+                    onTap: _chooseLanguage,
+                  ),
+                  const SizedBox(height: 20),
                   _buildInfoCard(
                     icon: Icons.person_outline_rounded,
-                    label: 'Jina Kamili',
+                    label: context.l10n.fullName,
                     value: _user?.fullName ?? '—',
                   ),
                   const SizedBox(height: 12),
                   _buildInfoCard(
                     icon: Icons.phone_outlined,
-                    label: 'Namba ya Simu',
+                    label: context.l10n.phoneNumber,
                     value: _user?.phone.isNotEmpty == true ? _user!.phone : '—',
                   ),
                   const SizedBox(height: 12),
                   _buildInfoCard(
                     icon: Icons.location_on_outlined,
-                    label: 'Mahali',
+                    label: context.l10n.location,
                     value: [_user?.region, _user?.country]
                         .where((s) => s != null && s.isNotEmpty && s != 'Unknown')
                         .join(', ')
@@ -209,7 +229,7 @@ class _AccountFragmentState extends State<AccountFragment> {
   // ── Header ───────────────────────────────────────────────────
 
   Widget _buildHeader() {
-    final name = _user?.fullName ?? 'Mtumiaji';
+    final name = _user?.fullName ?? context.l10n.userFallbackName;
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -318,7 +338,9 @@ class _AccountFragmentState extends State<AccountFragment> {
                       ),
                       const SizedBox(width: 7),
                       Text(
-                        _isActive ? 'Akaunti Hai' : 'Akaunti Imezimwa',
+                        _isActive
+                            ? context.l10n.accountActive
+                            : context.l10n.accountInactive,
                         style: TextStyle(
                           color: _isActive ? const Color(0xFF10B981) : Colors.red,
                           fontSize: 12,
@@ -407,9 +429,9 @@ class _AccountFragmentState extends State<AccountFragment> {
                   color: Color(0xFFFFD700), size: 20),
             ),
             const SizedBox(width: 10),
-            const Text(
-              'Usajili Wako',
-              style: TextStyle(
+            Text(
+              context.l10n.yourSubscription,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -423,9 +445,9 @@ class _AccountFragmentState extends State<AccountFragment> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: const Color(0xFF10B981).withAlpha(100)),
               ),
-              child: const Text(
-                'Hai',
-                style: TextStyle(
+              child: Text(
+                context.l10n.statusActive,
+                style: const TextStyle(
                   color: Color(0xFF10B981),
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -438,7 +460,7 @@ class _AccountFragmentState extends State<AccountFragment> {
 
         // Package name
         Text(
-          _packageName ?? 'Kifurushi cha Usajili',
+          _packageName ?? context.l10n.subscriptionPackage,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 22,
@@ -455,7 +477,7 @@ class _AccountFragmentState extends State<AccountFragment> {
                 color: Colors.white.withAlpha(150), size: 13),
             const SizedBox(width: 6),
             Text(
-              'Unaisha: ${_formatDate(_subscriptionExpiry!)}',
+              context.l10n.expiresOn(_formatDate(_subscriptionExpiry!)),
               style: TextStyle(
                 color: Colors.white.withAlpha(180),
                 fontSize: 13,
@@ -471,14 +493,14 @@ class _AccountFragmentState extends State<AccountFragment> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Muda uliobaki',
+                context.l10n.timeRemaining,
                 style: TextStyle(
                   color: Colors.white.withAlpha(150),
                   fontSize: 12,
                 ),
               ),
               Text(
-                '$_daysLeft siku',
+                context.l10n.daysCount(_daysLeft),
                 style: TextStyle(
                   color: _expiryColor,
                   fontSize: 13,
@@ -504,7 +526,7 @@ class _AccountFragmentState extends State<AccountFragment> {
               Text('0',
                   style: TextStyle(
                       color: Colors.white.withAlpha(80), fontSize: 10)),
-              Text('$_packageDurationDays siku',
+              Text(context.l10n.daysCount(_packageDurationDays!),
                   style: TextStyle(
                       color: Colors.white.withAlpha(80), fontSize: 10)),
             ],
@@ -532,7 +554,7 @@ class _AccountFragmentState extends State<AccountFragment> {
                   Icon(Icons.refresh_rounded, color: _expiryColor, size: 16),
                   const SizedBox(width: 8),
                   Text(
-                    'Fanya Upya Usajili',
+                    context.l10n.renewSubscription,
                     style: TextStyle(
                       color: _expiryColor,
                       fontSize: 13,
@@ -564,9 +586,9 @@ class _AccountFragmentState extends State<AccountFragment> {
                   color: Colors.white.withAlpha(120), size: 20),
             ),
             const SizedBox(width: 10),
-            const Text(
-              'Usajili Wako',
-              style: TextStyle(
+            Text(
+              context.l10n.yourSubscription,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -580,9 +602,9 @@ class _AccountFragmentState extends State<AccountFragment> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.red.withAlpha(100)),
               ),
-              child: const Text(
-                'Haina',
-                style: TextStyle(
+              child: Text(
+                context.l10n.statusNone,
+                style: const TextStyle(
                     color: Colors.red, fontSize: 11, fontWeight: FontWeight.w700),
               ),
             ),
@@ -590,7 +612,7 @@ class _AccountFragmentState extends State<AccountFragment> {
         ),
         const SizedBox(height: 20),
         Text(
-          'Huna usajili\nunaofanya kazi',
+          context.l10n.noActiveSubscription,
           style: TextStyle(
             color: Colors.white.withAlpha(200),
             fontSize: 20,
@@ -600,7 +622,7 @@ class _AccountFragmentState extends State<AccountFragment> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Jiandikishe ili uendelee\nkufurahia maudhui yetu.',
+          context.l10n.subscribePrompt,
           style: TextStyle(
             color: Colors.white.withAlpha(140),
             fontSize: 13,
@@ -619,14 +641,14 @@ class _AccountFragmentState extends State<AccountFragment> {
               color: const Color(0xFF00AEEF),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.lock_open_rounded, color: Colors.white, size: 16),
-                SizedBox(width: 8),
+                const Icon(Icons.lock_open_rounded, color: Colors.white, size: 16),
+                const SizedBox(width: 8),
                 Text(
-                  'Jiandikishe Sasa',
-                  style: TextStyle(
+                  context.l10n.subscribeNow,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -637,6 +659,94 @@ class _AccountFragmentState extends State<AccountFragment> {
           ),
         ),
       ],
+    );
+  }
+
+  // ── Settings: language ───────────────────────────────────────
+
+  // Each language is shown in its own name so it's recognisable whatever
+  // the current UI language is.
+  String _languageName(String code) => switch (code) {
+        'en' => 'English',
+        'fr' => 'Français',
+        _ => 'Kiswahili',
+      };
+
+  Future<void> _chooseLanguage() async {
+    final current = LocaleController.instance.locale.languageCode;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(context.l10n.chooseLanguage,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            for (final code in LocaleController.supportedLanguageCodes)
+              ListTile(
+                leading: Icon(
+                  code == current ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  color: const Color(0xFF8B2942),
+                ),
+                title: Text(_languageName(code)),
+                onTap: () => Navigator.pop(ctx, code),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) await LocaleController.instance.setLanguage(picked);
+  }
+
+  Widget _buildActionTile({
+    required IconData icon,
+    required String label,
+    String? value,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFBF4F6),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: const Color(0xFF8B2942), size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1D2E),
+                  ),
+                ),
+              ),
+              if (value != null)
+                Text(value, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFFADB5BD)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -722,14 +832,14 @@ class _AccountFragmentState extends State<AccountFragment> {
             ),
           ],
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 20),
-            SizedBox(width: 10),
+            const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 20),
+            const SizedBox(width: 10),
             Text(
-              'Toka Kwenye Akaunti',
-              style: TextStyle(
+              context.l10n.logout,
+              style: const TextStyle(
                 color: Color(0xFFEF4444),
                 fontSize: 14,
                 fontWeight: FontWeight.w700,

@@ -3,6 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:upendo_app/l10n/l10n.dart';
+import 'package:upendo_app/services/referral_service.dart';
+import 'package:upendo_app/utils/referral_code.dart';
 import 'package:upendo_app/utils/start_screen.dart';
 import 'package:upendo_app/views/welcome_screen.dart';
 
@@ -44,7 +47,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _regCountryCtrl = TextEditingController();
   final _regRegionCtrl  = TextEditingController();
   final _regPhoneCtrl   = TextEditingController();
+  final _referralCtrl   = TextEditingController();
   String? _selectedCountry;
+  // Optional referral code — only offered to new accounts that haven't
+  // been referred yet (canOfferReferralField); the applyReferralCode
+  // function makes the final call.
+  bool _canEnterReferral = false;
   String _completePhone = '';
 
   bool _isLoading = false;
@@ -63,7 +71,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final doc = await FirebaseFirestore.instance
         .collection('users').doc(user.uid).get();
     final data = doc.data();
-    if (data == null || !mounted) return;
+    if (!mounted) return;
+    setState(() {
+      _canEnterReferral = canOfferReferralField(
+        alreadyReferred: data?['referredBy'] != null,
+        accountCreatedAt: user.metadata.creationTime,
+      );
+    });
+    if (data == null) return;
     setState(() {
       final name = (data['fullName'] as String? ?? '').trim();
       if (name.isNotEmpty) _regNameCtrl.text = name;
@@ -82,6 +97,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     _regCountryCtrl.dispose();
     _regRegionCtrl.dispose();
     _regPhoneCtrl.dispose();
+    _referralCtrl.dispose();
     super.dispose();
   }
 
@@ -94,25 +110,40 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         _regCountryCtrl.text.isEmpty ||
         _regRegionCtrl.text.trim().isEmpty ||
         _completePhone.isEmpty) {
-      _showError('Tafadhali jaza nafasi zote');
+      _showError(context.l10n.profileFillAll);
       return;
     }
     setState(() => _isLoading = true);
     try {
       final ref = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      final existing = await ref.get();
+      final existing = (await ref.get()).data() ?? const <String, dynamic>{};
       await ref.set({
         'fullName': _regNameCtrl.text.trim(),
         'email':    user.email ?? '',
         'country':  _regCountryCtrl.text.trim(),
         'region':   _regRegionCtrl.text.trim(),
         'phone':    _completePhone,
-        // New account — locked behind a subscription until payment.
-        if (!existing.exists) ...{
-          'isActive':  false,
+        // New account — locked behind a subscription until payment. Also
+        // filled in when the doc exists without them (registerFcmToken
+        // usually creates it first with only fcmTokens); firestore.rules
+        // allow exactly this: isActive false while unset, createdAt once.
+        if (!existing.containsKey('isActive')) 'isActive': false,
+        if (!existing.containsKey('createdAt'))
           'createdAt': FieldValue.serverTimestamp(),
-        },
       }, SetOptions(merge: true));
+
+      // The profile is saved first (the server needs users/{uid} to
+      // exist). A rejected code keeps the user here to fix or clear it.
+      final referral = _referralCtrl.text.trim();
+      if (_canEnterReferral && referral.isNotEmpty) {
+        try {
+          await ReferralService().applyCode(referral);
+          if (mounted) setState(() => _canEnterReferral = false);
+        } on ReferralException catch (e) {
+          if (mounted) _showError(e.message(context.l10n));
+          return;
+        }
+      }
 
       final next = await startScreenFor(user);
       if (mounted) {
@@ -122,7 +153,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         );
       }
     } catch (e) {
-      _showError('Imeshindwa kuhifadhi: $e');
+      if (mounted) _showError(context.l10n.saveFailed('$e'));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -200,7 +231,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             onChanged: (v) => setSheet(() => query = v),
                             style: const TextStyle(color: Colors.white),
                             decoration: InputDecoration(
-                              hintText: 'Tafuta…',
+                              hintText: context.l10n.searchHint,
                               hintStyle: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.35)),
                               prefixIcon: const Icon(Icons.search_rounded,
@@ -275,10 +306,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   Image.asset('assets/images/logo.png',
                       height: 56, fit: BoxFit.contain),
                   const SizedBox(height: 18),
-                  const Text(
-                    'Kamilisha Taarifa Zako',
+                  Text(
+                    context.l10n.profileSetupTitle,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w700),
@@ -286,8 +317,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   const SizedBox(height: 6),
                   Text(
                     email == null
-                        ? 'Tunahitaji taarifa chache kabla ya kuendelea'
-                        : 'Umeingia kama $email',
+                        ? context.l10n.profileSetupSubtitle
+                        : context.l10n.signedInAs(email),
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.white70, fontSize: 13),
                   ),
@@ -305,8 +336,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: _isLoading ? null : _useAnotherAccount,
-                    child: const Text('Tumia akaunti nyingine ya Google',
-                        style: TextStyle(color: Colors.white70, fontSize: 13)),
+                    child: Text(context.l10n.useAnotherGoogleAccount,
+                        style: const TextStyle(color: Colors.white70, fontSize: 13)),
                   ),
                 ],
               ),
@@ -322,7 +353,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _field(
-          label: 'Jina Kamili',
+          label: context.l10n.fullName,
           icon: Icons.person_outline_rounded,
           controller: _regNameCtrl,
           capitalization: TextCapitalization.words,
@@ -330,12 +361,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         const SizedBox(height: 12),
         // Nchi dropdown
         _dropdownField(
-          label: 'Nchi',
+          label: context.l10n.country,
           icon: Icons.public_outlined,
           value: _regCountryCtrl.text.isEmpty ? null : _regCountryCtrl.text,
-          hint: 'Chagua nchi yako',
+          hint: context.l10n.chooseYourCountry,
           onTap: () async {
-            final result = await _showPickerSheet('Chagua Nchi', _countries);
+            final result =
+                await _showPickerSheet(context.l10n.chooseCountry, _countries);
             if (result != null) {
               setState(() {
                 _regCountryCtrl.text = result;
@@ -349,31 +381,41 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         // Mkoa — dropdown for Tanzania, text field otherwise
         if (_selectedCountry == 'Tanzania')
           _dropdownField(
-            label: 'Mkoa',
+            label: context.l10n.region,
             icon: Icons.location_city_outlined,
             value: _regRegionCtrl.text.isEmpty ? null : _regRegionCtrl.text,
-            hint: 'Chagua mkoa wako',
+            hint: context.l10n.chooseYourRegion,
             onTap: () async {
-              final result =
-                  await _showPickerSheet('Chagua Mkoa', _tanzaniaRegions);
+              final result = await _showPickerSheet(
+                  context.l10n.chooseRegion, _tanzaniaRegions);
               if (result != null) setState(() => _regRegionCtrl.text = result);
             },
           )
         else
           _field(
-            label: 'Mkoa / Jimbo',
+            label: context.l10n.regionOrState,
             icon: Icons.location_city_outlined,
             hint: _selectedCountry == null
-                ? 'Chagua nchi kwanza'
-                : 'Mkoa au jimbo lako',
+                ? context.l10n.chooseCountryFirst
+                : context.l10n.yourRegionOrState,
             controller: _regRegionCtrl,
             enabled: _selectedCountry != null,
             capitalization: TextCapitalization.words,
           ),
         const SizedBox(height: 12),
         _buildPhoneField(),
+        if (_canEnterReferral) ...[
+          const SizedBox(height: 12),
+          _field(
+            label: context.l10n.referralCodeOptional,
+            icon: Icons.card_giftcard_rounded,
+            hint: context.l10n.referralCodeHint,
+            controller: _referralCtrl,
+            capitalization: TextCapitalization.characters,
+          ),
+        ],
         const SizedBox(height: 24),
-        _primaryButton(text: 'HIFADHI NA ENDELEA', onPressed: _save),
+        _primaryButton(text: context.l10n.saveAndContinue, onPressed: _save),
       ],
     );
   }
@@ -382,8 +424,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Namba ya Simu',
-            style: TextStyle(
+        Text(context.l10n.phoneNumber,
+            style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
                 fontWeight: FontWeight.w600)),

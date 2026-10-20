@@ -4,6 +4,7 @@ class Attachment {
   static const image = 'image';
   static const video = 'video';
   static const pdf = 'pdf';
+  static const audio = 'audio';
 
   final String type;
   final String url;

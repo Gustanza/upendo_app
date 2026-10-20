@@ -28,7 +28,7 @@ class PostInteractionService {
     if (trimmed.isEmpty) return;
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final userDoc = await _db.collection('users').doc(uid).get();
-    final userName = (userDoc.data()?['fullName'] as String?) ?? 'Mtumiaji';
+    final userName = (userDoc.data()?['fullName'] as String?) ?? '';
     await _comments(postId).add({
       'userId': uid,
       'userName': userName,

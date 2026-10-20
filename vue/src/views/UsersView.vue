@@ -297,7 +297,7 @@ watch([search, statusFilter], () => { currentPage.value = 1 })
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = [
-  '#3b4cca', '#6a1b9a', '#00695c', '#c62828',
+  '#8b2942', '#6a1b9a', '#00695c', '#c62828',
   '#e65100', '#00838f', '#283593', '#4e342e',
 ]
 
@@ -417,7 +417,7 @@ async function doDelete() {
   font-size: 14px; color: #1a1d2e; background: #fff;
   outline: none; transition: border-color .15s; box-sizing: border-box;
 }
-.search-input:focus { border-color: #3b4cca; }
+.search-input:focus { border-color: #8b2942; }
 .search-input::placeholder { color: #9ca3af; }
 
 .filter-tabs { display: flex; gap: 6px; }
@@ -426,8 +426,8 @@ async function doDelete() {
   background: #fff; font-size: 13px; font-weight: 500; color: #6b7280; cursor: pointer;
   transition: all .12s;
 }
-.filter-tab:hover { border-color: #3b4cca; color: #3b4cca; }
-.filter-tab.active { background: #3b4cca; border-color: #3b4cca; color: #fff; }
+.filter-tab:hover { border-color: #8b2942; color: #8b2942; }
+.filter-tab.active { background: #8b2942; border-color: #8b2942; color: #fff; }
 
 /* ── Empty ── */
 .empty-state {
@@ -482,7 +482,7 @@ async function doDelete() {
   color: #6b7280; transition: all .12s;
 }
 .btn-action svg { width: 14px; height: 14px; }
-.btn-action:hover { border-color: #3b4cca; color: #3b4cca; background: #eef0fd; }
+.btn-action:hover { border-color: #8b2942; color: #8b2942; background: #f8eaed; }
 .btn-action.danger:hover { border-color: #fca5a5; color: #dc2626; background: #fee2e2; }
 
 /* ── Modal overlay ── */
@@ -543,7 +543,7 @@ async function doDelete() {
   width: 44px; height: 24px; border-radius: 12px;
   background: #d1d5db; transition: background .2s; position: relative;
 }
-.toggle-input:checked ~ .toggle-track { background: #3b4cca; }
+.toggle-input:checked ~ .toggle-track { background: #8b2942; }
 .toggle-thumb {
   position: absolute; top: 4px; left: 4px; width: 16px; height: 16px;
   border-radius: 50%; background: #fff;
@@ -559,7 +559,7 @@ async function doDelete() {
   font-size: 14px; color: #1a1d2e; background: #fafbff; outline: none;
   transition: border-color .15s;
 }
-.date-input:focus { border-color: #3b4cca; }
+.date-input:focus { border-color: #8b2942; }
 
 .modal-footer {
   padding: 16px 24px; border-top: 1px solid #e8eaf0;
@@ -571,10 +571,10 @@ async function doDelete() {
 }
 .btn-cancel:hover { background: #f3f4f6; }
 .btn-save {
-  padding: 9px 22px; border: none; border-radius: 8px; background: #3b4cca;
+  padding: 9px 22px; border: none; border-radius: 8px; background: #8b2942;
   color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s;
 }
-.btn-save:hover:not(:disabled) { background: #2f3da0; }
+.btn-save:hover:not(:disabled) { background: #6e1f33; }
 .btn-save:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ── Pagination ── */
@@ -599,7 +599,7 @@ async function doDelete() {
   cursor: pointer;
   transition: all .12s;
 }
-.page-btn:hover:not(:disabled) { border-color: #3b4cca; color: #3b4cca; }
+.page-btn:hover:not(:disabled) { border-color: #8b2942; color: #8b2942; }
 .page-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ── Confirm delete ── */

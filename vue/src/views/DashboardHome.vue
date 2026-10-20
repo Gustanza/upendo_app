@@ -4,8 +4,8 @@
     <!-- Stat cards -->
     <div class="stat-grid">
       <div class="stat-card">
-        <div class="stat-icon" style="background:#eef0fb">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#3b4cca" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div class="stat-icon" style="background:#f8eaed">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#8b2942" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         </div>
         <div>
           <div class="stat-value">{{ posts.length }}</div>
@@ -150,7 +150,7 @@ const categories = ref([])
 const users      = ref([])
 
 const TYPE_COLORS = {
-  video:  '#3b4cca',
+  video:  '#8b2942',
   audio:  '#9333ea',
   pdf:    '#ea580c',
   music:  '#16a34a',
@@ -270,7 +270,7 @@ onUnmounted(() => unsubs.forEach(u => u()))
   border-bottom: 1px solid #f3f4f6;
 }
 .card-header h3 { margin: 0; font-size: 14px; font-weight: 700; color: #1a1d2e; }
-.see-all { font-size: 12px; color: #3b4cca; text-decoration: none; font-weight: 500; }
+.see-all { font-size: 12px; color: #8b2942; text-decoration: none; font-weight: 500; }
 .see-all:hover { text-decoration: underline; }
 
 /* ── Post types ── */

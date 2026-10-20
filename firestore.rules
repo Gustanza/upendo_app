@@ -3,6 +3,26 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Admins: a verified Google account whose lower-cased email has a doc
+    // in /admins (created by hand in the Firebase console — no client can
+    // write it). Keep it in sync with the dashboard's VITE_ADMIN_EMAILS.
+    // Same check as functions/admin/isAdmin.js and storage.rules.
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.get('email_verified', false) == true
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.get('email', '').lower()));
+    }
+
+    match /admins/{email} {
+      // Lets the dashboard check "am I an admin" for a friendlier message.
+      allow read: if signedIn() && request.auth.token.get('email', '').lower() == email;
+      allow write: if false;
+    }
+
     match /posts/{postId} {
       allow read, write: if request.auth != null;
       // likeCount/commentCount are server-only (maintained by Cloud Functions
@@ -113,9 +133,21 @@ service cloud.firestore {
       // lastMessage/updatedAt are server-only — maintained by the
       // notifyConversationMessage Cloud Function (Admin SDK, bypasses these
       // rules) whenever a message is sent, the same way likeCount/
-      // commentCount are maintained elsewhere. No allow update/delete: a
-      // conversation, once created, is never directly written by a client
-      // again.
+      // commentCount are maintained elsewhere.
+      //
+      // The one client update allowed is "delete chat for me": a
+      // participant stamps deletedAt.{theirUid} with the server time
+      // (ConversationService.deleteConversationForMe). Nothing else may
+      // change — not the other participant's entry, not any other field —
+      // so the other participant's view is never affected. No delete: the
+      // doc and its messages stay for the other participant.
+      allow update: if request.auth != null
+        && request.auth.uid in resource.data.participants
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt'])
+        && request.resource.data.deletedAt is map
+        && request.resource.data.deletedAt.diff(resource.data.get('deletedAt', {}))
+             .affectedKeys().hasOnly([request.auth.uid])
+        && request.resource.data.deletedAt[request.auth.uid] == request.time;
 
       match /messages/{messageId} {
         allow read: if request.auth != null
@@ -149,7 +181,305 @@ service cloud.firestore {
     }
 
     match /categories/{document=**}    { allow read, write: if request.auth != null; }
-    match /users/{document=**}         { allow read, write: if request.auth != null; }
+
+    // Top level of the category hierarchy (group → main → sub), managed
+    // from the admin dashboard; main categories reference one via groupId.
+    match /categoryGroups/{groupId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Referral fields are written only by the referral Cloud Functions
+    // (generateReferralCode / applyReferralCode) — no client, not even an
+    // admin, may set or change them.
+    function referralFields() {
+      return ['referralCode', 'referralCodeCreatedAt', 'referredBy', 'referredByCode', 'referredAt'];
+    }
+    // Subscription state is written by the payment Cloud Functions (and by
+    // admins from the dashboard's Users page) — never by the user, or anyone
+    // could give themselves a free subscription. createdAt is fixed once set.
+    function subscriptionFields() {
+      return ['subscriptionExpiry', 'activePackageId', 'activeSubscriptionId', 'expire_date', 'fcmTokens'];
+    }
+    // createdAt can be set once (to the server time) and never changed.
+    function createdAtOk(changed) {
+      return !changed.hasAny(['createdAt'])
+        || (!('createdAt' in resource.data) && request.resource.data.createdAt == request.time);
+    }
+    // What the owner may change: anything but subscription state. isActive
+    // may only be written as false while it isn't already true (profile
+    // setup sends isActive: false for a doc the FCM-token function may have
+    // created a moment earlier).
+    function ownerSafeUpdate(changed) {
+      return !changed.hasAny(subscriptionFields())
+        && (!changed.hasAny(['isActive'])
+            || (request.resource.data.isActive == false && resource.data.get('isActive', false) == false));
+    }
+
+    // A user doc can only be written by its owner (or an admin):
+    //  * create (ProfileSetupScreen): no referral/subscription fields except
+    //    isActive == false, and createdAt == request.time if present;
+    //  * update: owner may change profile fields only; admins may also
+    //    change subscription state (UsersView), but not referral fields or
+    //    createdAt;
+    //  * delete: admins only — otherwise a user could delete and recreate
+    //    their doc to shed referral/subscription history.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && (request.auth.uid == uid || isAdmin())
+        && !request.resource.data.keys().hasAny(referralFields())
+        && !request.resource.data.keys().hasAny(subscriptionFields())
+        && request.resource.data.get('isActive', false) == false
+        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt == request.time);
+      allow update: if signedIn()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(referralFields())
+        && createdAtOk(request.resource.data.diff(resource.data).affectedKeys())
+        && ((request.auth.uid == uid
+              && ownerSafeUpdate(request.resource.data.diff(resource.data).affectedKeys()))
+            || isAdmin());
+      allow delete: if isAdmin();
+      // Subcollections only — a bare {document=**} would also match the
+      // user doc itself (zero segments) and undo the checks above.
+      match /{subcollection}/{document=**} {
+        allow read, write: if signedIn() && (request.auth.uid == uid || isAdmin());
+      }
+    }
+
+    // Permanent record of who referred whom (written by applyReferralCode);
+    // the source of truth for "already referred" and for commissions.
+    match /referralClaims/{claimUid} {
+      allow read: if signedIn() && (request.auth.uid == claimUid || isAdmin());
+      allow write: if false;
+    }
+
+    // ── Community feeds outside the wall ───────────────────────────────
+    // Shared shape checks for thread posts / chat messages in subcategory
+    // feeds and user groups (mirrors MediaLimits.community in the app).
+    function validPost(data) {
+      return data.authorId == request.auth.uid
+        && data.text is string
+        && data.text.size() <= 1000
+        && data.get('attachments', []) is list
+        && data.get('attachments', []).size() <= 10
+        && data.get('links', []) is list
+        && data.get('links', []).size() <= 3
+        && !data.keys().hasAny(['likeCount', 'commentCount']);
+    }
+    function validMessage(data) {
+      return data.senderId == request.auth.uid
+        && data.text is string
+        && data.text.size() <= 500
+        && data.get('senderName', '') is string
+        && data.get('senderName', '').size() <= 100
+        && data.get('attachments', []) is list
+        && data.get('attachments', []).size() <= 10
+        && (data.text.size() > 0 || data.get('attachments', []).size() > 0);
+    }
+    function validReply(data) {
+      return data.authorId == request.auth.uid
+        && data.text is string
+        && data.text.size() > 0
+        && data.text.size() <= 1000;
+    }
+    function countersUntouched() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['likeCount', 'commentCount', 'authorId']);
+    }
+
+    // Every subcategory's open discussion feed and chat room — any signed-in
+    // user can read and post. Authors (and admins) delete; counters and
+    // cleanup are server-side (functions/interactions/scopedFeeds.js).
+    match /subcategoryFeeds/{categoryId} {
+      match /posts/{postId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && validPost(request.resource.data)
+          && !('links' in request.resource.data);
+        allow update: if signedIn()
+          && resource.data.authorId == request.auth.uid
+          && countersUntouched();
+        allow delete: if signedIn()
+          && (resource.data.authorId == request.auth.uid || isAdmin());
+
+        match /replies/{replyId} {
+          allow read: if signedIn();
+          allow create: if signedIn() && validReply(request.resource.data);
+          allow update: if false;
+          allow delete: if signedIn()
+            && (resource.data.authorId == request.auth.uid || isAdmin());
+        }
+        match /likes/{uid} {
+          allow read: if signedIn();
+          allow write: if signedIn() && request.auth.uid == uid;
+        }
+        match /pollResponses/{uid} {
+          allow read: if signedIn();
+          allow write: if signedIn() && request.auth.uid == uid;
+        }
+      }
+
+      match /messages/{messageId} {
+        allow read: if signedIn();
+        allow create: if signedIn() && validMessage(request.resource.data);
+        allow update: if false;
+        allow delete: if signedIn()
+          && (resource.data.senderId == request.auth.uid || isAdmin());
+
+        match /pollResponses/{uid} {
+          allow read: if signedIn();
+          allow write: if signedIn() && request.auth.uid == uid;
+        }
+      }
+    }
+
+    // User-created groups inside a subcategory. Membership is the doc
+    // userGroups/{g}/members/{uid}; posts, chat and their likes/polls are
+    // members-only (admins may read everything for moderation). The owner
+    // (ownerId) edits the group, removes posts/replies/messages and removes
+    // members — a removal also writes bans/{uid}, which blocks rejoining.
+    function groupDoc(groupId) {
+      return /databases/$(database)/documents/userGroups/$(groupId);
+    }
+    function isGroupMember(groupId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/userGroups/$(groupId)/members/$(request.auth.uid));
+    }
+    function isGroupOwner(groupId) {
+      return signedIn() && get(groupDoc(groupId)).data.ownerId == request.auth.uid;
+    }
+
+    match /userGroups/{groupId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.subcategoryId is string
+        && request.resource.data.subcategoryId.size() > 0
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.get('description', '') is string
+        && request.resource.data.get('description', '').size() <= 500
+        // memberCount is server-only (updateGroupMemberCount).
+        && request.resource.data.keys().hasOnly([
+             'subcategoryId', 'name', 'description', 'ownerId', 'ownerName',
+             'photoUrl', 'photoPath', 'createdAt', 'updatedAt']);
+      allow update: if signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'description', 'photoUrl', 'photoPath', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.get('description', '') is string
+        && request.resource.data.get('description', '').size() <= 500;
+      allow delete: if signedIn()
+        && (resource.data.ownerId == request.auth.uid || isAdmin());
+
+      match /members/{memberUid} {
+        allow read: if signedIn();
+        // Join yourself as a plain member (unless the owner removed you),
+        // or — only in the same batch that creates the group — as its owner.
+        allow create: if signedIn()
+          && memberUid == request.auth.uid
+          && request.resource.data.name is string
+          && request.resource.data.joinedAt == request.time
+          && (
+            (request.resource.data.role == 'member'
+              && exists(groupDoc(groupId))
+              && !exists(/databases/$(database)/documents/userGroups/$(groupId)/bans/$(memberUid)))
+            || (request.resource.data.role == 'owner'
+              && !exists(groupDoc(groupId))
+              && getAfter(groupDoc(groupId)).data.ownerId == request.auth.uid)
+          );
+        allow update: if false;
+        // Leave (not the owner — they delete the group instead), be removed
+        // by the owner, or by an admin.
+        allow delete: if signedIn() && (
+          (memberUid == request.auth.uid && resource.data.role != 'owner')
+          || (memberUid != request.auth.uid && isGroupOwner(groupId))
+          || isAdmin());
+      }
+
+      match /bans/{bannedUid} {
+        allow read: if signedIn()
+          && (bannedUid == request.auth.uid || isGroupOwner(groupId) || isAdmin());
+        allow create, update: if isGroupOwner(groupId)
+          && bannedUid != request.auth.uid
+          && request.resource.data.bannedBy == request.auth.uid;
+        allow delete: if isGroupOwner(groupId) || isAdmin();
+      }
+
+      match /posts/{postId} {
+        allow read: if isGroupMember(groupId) || isAdmin();
+        allow create: if isGroupMember(groupId) && validPost(request.resource.data);
+        allow update: if isGroupMember(groupId)
+          && resource.data.authorId == request.auth.uid
+          && countersUntouched();
+        allow delete: if signedIn() && (
+          resource.data.authorId == request.auth.uid
+          || isGroupOwner(groupId)
+          || isAdmin());
+
+        match /replies/{replyId} {
+          allow read: if isGroupMember(groupId) || isAdmin();
+          allow create: if isGroupMember(groupId) && validReply(request.resource.data);
+          allow update: if false;
+          allow delete: if signedIn() && (
+            resource.data.authorId == request.auth.uid
+            || isGroupOwner(groupId)
+            || isAdmin());
+        }
+        match /likes/{uid} {
+          allow read: if isGroupMember(groupId) || isAdmin();
+          allow write: if isGroupMember(groupId) && request.auth.uid == uid;
+        }
+        match /pollResponses/{uid} {
+          allow read: if isGroupMember(groupId) || isAdmin();
+          allow write: if isGroupMember(groupId) && request.auth.uid == uid;
+        }
+      }
+
+      match /messages/{messageId} {
+        allow read: if isGroupMember(groupId) || isAdmin();
+        allow create: if isGroupMember(groupId) && validMessage(request.resource.data);
+        allow update: if false;
+        allow delete: if signedIn() && (
+          resource.data.senderId == request.auth.uid
+          || isGroupOwner(groupId)
+          || isAdmin());
+
+        match /pollResponses/{uid} {
+          allow read: if isGroupMember(groupId) || isAdmin();
+          allow write: if isGroupMember(groupId) && request.auth.uid == uid;
+        }
+      }
+    }
+
+    // ── Referrals & wallet ─────────────────────────────────────────────
+    // Balances, credits, ledger entries, referral codes and withdrawal
+    // requests are written ONLY by Cloud Functions (Admin SDK, bypasses
+    // these rules): generateReferralCode, applyReferralCode, the payment
+    // webhooks (referral commission), requestWithdrawal and
+    // adminResolveWithdrawal. Clients can only read their own.
+    match /wallets/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if false;
+
+      match /transactions/{entryId} {
+        allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+        allow write: if false;
+      }
+    }
+    match /referralCodes/{code} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /withdrawalRequests/{requestId} {
+      allow read: if signedIn()
+        && (resource.data.uid == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
     match /packages/{document=**}      { allow read, write: if request.auth != null; }
     match /notifications/{notifId} {
       // A notification is either a public broadcast (no recipientId, or
@@ -185,6 +515,13 @@ service cloud.firestore {
     }
     // subscriptions is only ever touched by Cloud Functions (Admin SDK, bypasses
     // these rules) — this entry just avoids an implicit deny if a client ever reads it.
-    match /subscriptions/{document=**} { allow read, write: if request.auth != null; }
+    // Client writes are now denied: referral commissions are computed from
+    // these docs, so a client-forged "Completed" subscription must not be
+    // possible. The app only reads its own subscription doc by id
+    // (ProfilePaymentScreen._listenForFailure).
+    match /subscriptions/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }

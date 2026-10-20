@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../l10n/l10n.dart';
 
 /// Support numbers shown on the payment screen.
 const kSupportPhoneNumbers = [
@@ -17,7 +18,7 @@ Future<void> showContactOptions(BuildContext context, String number) {
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Imeshindwa kufungua programu husika')),
+        SnackBar(content: Text(context.l10n.openAppFailed)),
       );
     }
   }
@@ -36,12 +37,12 @@ Future<void> showContactOptions(BuildContext context, String number) {
           const SizedBox(height: 8),
           ListTile(
             leading: const Icon(Icons.call_rounded, color: Color(0xFF0072FF)),
-            title: const Text('Piga simu'),
+            title: Text(context.l10n.callNumber),
             onTap: () => open(sheetCtx, Uri(scheme: 'tel', path: digits)),
           ),
           ListTile(
             leading: const Icon(Icons.chat_rounded, color: Color(0xFF25D366)),
-            title: const Text('Tuma ujumbe WhatsApp'),
+            title: Text(context.l10n.messageOnWhatsApp),
             onTap: () => open(
               sheetCtx,
               Uri.parse('https://wa.me/${digits.replaceFirst('+', '')}'),
@@ -49,12 +50,12 @@ Future<void> showContactOptions(BuildContext context, String number) {
           ),
           ListTile(
             leading: const Icon(Icons.copy_rounded),
-            title: const Text('Nakili namba'),
+            title: Text(context.l10n.copyNumber),
             onTap: () {
               Clipboard.setData(ClipboardData(text: digits));
               Navigator.pop(sheetCtx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Namba imenakiliwa')),
+                SnackBar(content: Text(context.l10n.numberCopied)),
               );
             },
           ),

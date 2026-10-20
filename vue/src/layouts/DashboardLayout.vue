@@ -2,8 +2,8 @@
   <div class="dashboard">
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <span class="brand-icon">🌸</span>
-        <span class="brand-name">Upendo Admin</span>
+        <img src="/moyo-logo.png" alt="Moyo" class="brand-logo" />
+        <span class="brand-name">Admin</span>
       </div>
 
       <nav class="sidebar-nav">
@@ -22,6 +22,16 @@
           Categories
         </RouterLink>
 
+        <RouterLink to="/category-groups" class="nav-item" active-class="active">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          Category Groups
+        </RouterLink>
+
+        <RouterLink to="/user-groups" class="nav-item" active-class="active">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M15 20c0-2.5 1-4.5 3-5.3 1.8.6 3 2.6 3 5.3"/></svg>
+          User Groups
+        </RouterLink>
+
         <RouterLink to="/users" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Users
@@ -35,6 +45,11 @@
         <RouterLink to="/notifications" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           Notifications
+        </RouterLink>
+
+        <RouterLink to="/withdrawals" class="nav-item" active-class="active">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M16 15h2"/></svg>
+          Withdrawals
         </RouterLink>
       </nav>
     </aside>
@@ -74,6 +89,9 @@ const pageTitle = computed(() => {
   if (route.path === '/users') return 'Users'
   if (route.path === '/packages') return 'Packages'
   if (route.path === '/notifications') return 'Notifications'
+  if (route.path === '/category-groups') return 'Category Groups'
+  if (route.path === '/user-groups') return 'User Groups'
+  if (route.path === '/withdrawals') return 'Withdrawals & Referrals'
   return 'Overview'
 })
 
@@ -97,7 +115,7 @@ async function handleLogout() {
 .sidebar {
   width: 240px;
   min-height: 100vh;
-  background: #1a1d2e;
+  background: #2a0f17;
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -112,10 +130,10 @@ async function handleLogout() {
   align-items: center;
   gap: 10px;
   padding: 22px 20px;
-  border-bottom: 1px solid #2a2d40;
+  border-bottom: 1px solid #3d1a24;
 }
 
-.brand-icon { font-size: 22px; }
+.brand-logo { height: 32px; width: auto; display: block; }
 
 .brand-name {
   font-size: 16px;
@@ -144,8 +162,8 @@ async function handleLogout() {
   transition: all 0.15s;
 }
 
-.nav-item:hover { background: #2a2d40; color: #d0d3e8; }
-.nav-item.active { background: #3b4cca; color: #fff; }
+.nav-item:hover { background: #3d1a24; color: #d0d3e8; }
+.nav-item.active { background: #8b2942; color: #fff; }
 
 .nav-icon {
   width: 18px;
@@ -196,7 +214,7 @@ async function handleLogout() {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #3b4cca;
+  background: #8b2942;
   color: #fff;
   font-size: 12px;
   font-weight: 700;

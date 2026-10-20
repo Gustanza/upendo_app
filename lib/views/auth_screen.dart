@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:upendo_app/l10n/l10n.dart';
 import 'package:upendo_app/utils/start_screen.dart';
 
 /// Single entry point for both new and returning users: one Google button.
@@ -36,11 +37,11 @@ class _AuthScreenState extends State<AuthScreen> {
         );
       }
     } on GoogleSignInException catch (e) {
-      if (e.code != GoogleSignInExceptionCode.canceled) {
-        _showError(e.description ?? 'Imeshindwa kuingia na Google');
+      if (e.code != GoogleSignInExceptionCode.canceled && mounted) {
+        _showError(e.description ?? context.l10n.authGoogleFailed);
       }
     } on FirebaseAuthException catch (e) {
-      _showError(e.message ?? 'Hitilafu imetokea wakati wa kuingia');
+      if (mounted) _showError(e.message ?? context.l10n.authSignInError);
     } catch (e) {
       _showError(e.toString());
     } finally {
@@ -85,10 +86,10 @@ class _AuthScreenState extends State<AuthScreen> {
                   Image.asset('assets/images/logo.png',
                       height: 72, fit: BoxFit.contain),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Jifunze · Kukua · Kupenda',
+                  Text(
+                    context.l10n.authTagline,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 13,
                       letterSpacing: 1.4,
@@ -96,17 +97,17 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ),
                   const Spacer(flex: 2),
-                  const Text(
-                    'Karibu Moyo App',
+                  Text(
+                    context.l10n.authWelcome,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                         color: Colors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Endelea kwa akaunti yako ya Google',
+                    context.l10n.authContinueWithGoogleHint,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.75),
@@ -145,10 +146,10 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: CircularProgressIndicator(
                     color: Color(0xFF0072FF), strokeWidth: 2.2),
               )
-            : const Row(
+            : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
+                  const Text(
                     'G',
                     style: TextStyle(
                       color: Color(0xFF4285F4),
@@ -156,10 +157,10 @@ class _AuthScreenState extends State<AuthScreen> {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Text(
-                    'ENDELEA NA GOOGLE',
-                    style: TextStyle(
+                    context.l10n.authGoogleButton,
+                    style: const TextStyle(
                       color: Color(0xFF1a1d2e),
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
@@ -177,13 +178,13 @@ class _AuthScreenState extends State<AuthScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: RichText(
         textAlign: TextAlign.center,
-        text: const TextSpan(
-          style: TextStyle(color: Colors.white54, fontSize: 11),
+        text: TextSpan(
+          style: const TextStyle(color: Colors.white54, fontSize: 11),
           children: [
-            TextSpan(text: 'Kwa kuendelea unakubaliana na '),
+            TextSpan(text: context.l10n.authTermsPrefix),
             TextSpan(
-              text: 'Vigezo na masharti',
-              style: TextStyle(
+              text: context.l10n.authTermsLink,
+              style: const TextStyle(
                   color: Colors.white, decoration: TextDecoration.underline),
             ),
           ],

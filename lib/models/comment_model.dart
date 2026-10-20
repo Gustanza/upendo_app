@@ -19,7 +19,7 @@ class CommentModel {
     return CommentModel(
       id: id,
       userId: data['userId'] ?? '',
-      userName: data['userName'] ?? 'Mtumiaji',
+      userName: data['userName'] ?? '',
       text: data['text'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );

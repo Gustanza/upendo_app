@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 import '../models/category_model.dart';
 import '../services/category_service.dart';
 import '../utils/category_navigation.dart';
@@ -7,7 +8,7 @@ class CategorySearchDelegate extends SearchDelegate<Category?> {
   final CategoryService _categoryService = CategoryService();
 
   @override
-  String get searchFieldLabel => 'Tafuta categories...';
+  String get searchFieldLabel => currentL10n.searchCategoriesHint;
 
   @override
   List<Widget>? buildActions(BuildContext context) {
@@ -33,17 +34,17 @@ class CategorySearchDelegate extends SearchDelegate<Category?> {
 
   @override
   Widget buildResults(BuildContext context) {
-    return _buildCategoryList(query);
+    return _buildCategoryList(context, query);
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    return _buildCategoryList(query);
+    return _buildCategoryList(context, query);
   }
 
-  Widget _buildCategoryList(String query) {
+  Widget _buildCategoryList(BuildContext context, String query) {
     if (query.isEmpty) {
-      return const Center(child: Text('Andika jina la category kutafuta'));
+      return Center(child: Text(context.l10n.searchCategoryPrompt));
     }
 
     return StreamBuilder<List<Category>>(
@@ -55,7 +56,8 @@ class CategorySearchDelegate extends SearchDelegate<Category?> {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('Hitilafu: ${snapshot.error}'));
+          return Center(
+              child: Text(context.l10n.errorWithDetails('${snapshot.error}')));
         }
 
         final categories = snapshot.data ?? [];
@@ -65,7 +67,7 @@ class CategorySearchDelegate extends SearchDelegate<Category?> {
             .toList();
 
         if (matches.isEmpty) {
-          return const Center(child: Text('Category haijapatikana'));
+          return Center(child: Text(context.l10n.categoryNotFound));
         }
 
         // A child category never has children of its own (one level of
@@ -88,7 +90,7 @@ class CategorySearchDelegate extends SearchDelegate<Category?> {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               subtitle:
-                  category.isProtected ? const Text('Imefungwa kwa password') : null,
+                  category.isProtected ? Text(context.l10n.passwordProtected) : null,
               trailing: const Icon(Icons.chevron_right, size: 20),
               onTap: () => openCategory(
                 context,

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:video_player/video_player.dart';
 
+import '../l10n/l10n.dart';
 import '../models/attachment_model.dart';
 
 String formatFileSize(int bytes) {
@@ -46,9 +47,11 @@ class AttachmentDraftStrip extends StatelessWidget {
                   child: item.type == Attachment.image
                       ? Image.file(File(item.localPath), fit: BoxFit.cover)
                       : _FileTile(
-                          icon: item.type == Attachment.video
-                              ? Icons.play_circle_fill_rounded
-                              : Icons.picture_as_pdf_rounded,
+                          icon: switch (item.type) {
+                            Attachment.video => Icons.play_circle_fill_rounded,
+                            Attachment.audio => Icons.audiotrack_rounded,
+                            _ => Icons.picture_as_pdf_rounded,
+                          },
                           label: formatFileSize(item.size),
                         ),
                 ),
@@ -98,7 +101,8 @@ class _FileTile extends StatelessWidget {
 // ── Display: sent attachments ──────────────────────────────────
 
 /// Renders a message's / post's attachments: an image grid, then one tile
-/// per video and PDF. Tapping opens a full-screen viewer.
+/// per video, audio and PDF. Tapping opens a full-screen viewer (audio
+/// plays inline).
 class AttachmentsView extends StatelessWidget {
   final List<Attachment> attachments;
   // Light-on-dark styling, for the sender's own (blue) chat bubbles.
@@ -117,9 +121,11 @@ class AttachmentsView extends StatelessWidget {
         if (images.isNotEmpty) _ImageGrid(images: images),
         for (final f in files) ...[
           if (images.isNotEmpty || f != files.first) const SizedBox(height: 6),
-          f.type == Attachment.video
-              ? _VideoTile(attachment: f)
-              : _PdfTile(attachment: f, onDark: onDark),
+          switch (f.type) {
+            Attachment.video => _VideoTile(attachment: f),
+            Attachment.audio => AudioAttachmentTile(attachment: f, onDark: onDark),
+            _ => _PdfTile(attachment: f, onDark: onDark),
+          },
         ],
       ],
     );
@@ -251,7 +257,7 @@ class _PdfTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      attachment.name ?? 'Hati ya PDF',
+                      attachment.name ?? context.l10n.pdfDocument,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 13),
@@ -266,6 +272,139 @@ class _PdfTile extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Inline player for an audio attachment. video_player plays audio-only
+/// files too, so no extra dependency is needed; the controller is only
+/// created on first tap so a long chat doesn't open dozens of streams.
+class AudioAttachmentTile extends StatefulWidget {
+  final Attachment attachment;
+  final bool onDark;
+  const AudioAttachmentTile({super.key, required this.attachment, this.onDark = false});
+
+  @override
+  State<AudioAttachmentTile> createState() => _AudioAttachmentTileState();
+}
+
+class _AudioAttachmentTileState extends State<AudioAttachmentTile> {
+  VideoPlayerController? _controller;
+  bool _loading = false;
+  bool _failed = false;
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    final existing = _controller;
+    if (existing != null) {
+      existing.value.isPlaying ? await existing.pause() : await existing.play();
+      return;
+    }
+    setState(() => _loading = true);
+    final controller =
+        VideoPlayerController.networkUrl(Uri.parse(widget.attachment.url));
+    try {
+      await controller.initialize();
+      controller.addListener(() {
+        if (mounted) setState(() {});
+      });
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      setState(() {
+        _controller = controller;
+        _loading = false;
+      });
+      await controller.play();
+    } catch (_) {
+      await controller.dispose();
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _failed = true;
+        });
+      }
+    }
+  }
+
+  String _fmt(Duration d) =>
+      '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = widget.onDark ? Colors.white : const Color(0xFF1A1D2E);
+    final controller = _controller;
+    final playing = controller?.value.isPlaying ?? false;
+    return Material(
+      color: widget.onDark ? Colors.white.withValues(alpha: 0.15) : Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: _loading || _failed ? null : _toggle,
+              icon: _loading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      _failed
+                          ? Icons.error_outline_rounded
+                          : playing
+                              ? Icons.pause_circle_filled_rounded
+                              : Icons.play_circle_fill_rounded,
+                      size: 34,
+                      color: _failed ? Colors.redAccent : const Color(0xFF8B2942),
+                    ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _failed
+                        ? context.l10n.audioPlaybackFailed
+                        : (widget.attachment.name ?? context.l10n.audioClip),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  const SizedBox(height: 4),
+                  if (controller != null)
+                    VideoProgressIndicator(
+                      controller,
+                      allowScrubbing: true,
+                      colors: const VideoProgressColors(playedColor: Color(0xFF8B2942)),
+                    )
+                  else if (widget.attachment.size != null)
+                    Text(
+                      formatFileSize(widget.attachment.size!),
+                      style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 11),
+                    ),
+                  if (controller != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        '${_fmt(controller.value.position)} / ${_fmt(controller.value.duration)}',
+                        style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 10),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -340,8 +479,8 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> {
       appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
       body: Center(
         child: _failed
-            ? const Text('Imeshindwa kucheza video',
-                style: TextStyle(color: Colors.white70))
+            ? Text(context.l10n.videoPlaybackFailed,
+                style: const TextStyle(color: Colors.white70))
             : _chewie == null
                 ? const CircularProgressIndicator(color: Colors.white)
                 : Chewie(controller: _chewie!),

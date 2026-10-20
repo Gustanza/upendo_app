@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:upendo_app/l10n/l10n.dart';
 import 'package:upendo_app/views/auth_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -87,9 +88,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text(
-                          'ENDELEA',
-                          style: TextStyle(
+                        child: Text(
+                          context.l10n.continueButton,
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 1.2,
@@ -125,10 +126,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           const Spacer(flex: 3),
           _buildMoyoLogo(),
           const SizedBox(height: 44),
-          const Text(
-            'Karibu\nKatika Moyo App',
+          Text(
+            context.l10n.welcomeTitle,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 28,
               fontWeight: FontWeight.w700,
@@ -145,10 +146,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
-            'Hii ni App kwa ajili gani',
+          Text(
+            context.l10n.welcomeWhatFor,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 17,
               fontWeight: FontWeight.w400,
@@ -156,10 +157,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Moyo App ni chanzo chako cha habari,\nmafunzo na msukumo wa kila siku.\nTunakuletea maudhui ya moyo wazi.',
+          Text(
+            context.l10n.welcomeIntro,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.7),
+            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.7),
           ),
           const Spacer(flex: 3),
         ],
@@ -203,22 +204,22 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         // Stylized Moyo Logo
         _buildMoyoLogo(),
         const SizedBox(height: 20),
-        const Text(
-          'Humu utafaidika nini?',
+        Text(
+          context.l10n.welcomeBenefitTitle,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 22,
             fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 15),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 40.0),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40.0),
           child: Text(
-            'Pata maudhui mapya kila siku, jifunze,\nna ushirikiane na jamii yenye upendo\nna mioyo iliyojaa furaha na imani.',
+            context.l10n.welcomeBenefitBody,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
           ),
         ),
         const Spacer(flex: 1),
@@ -241,7 +242,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       height: 8.0,
       width: isActive ? 12.0 : 8.0,
       decoration: BoxDecoration(
-        color: isActive ? Colors.white : Colors.white.withOpacity(0.3),
+        color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(4),
       ),
     );

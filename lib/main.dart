@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:upendo_app/l10n/l10n.dart';
+import 'package:upendo_app/services/locale_controller.dart';
 import 'package:upendo_app/utils/start_screen.dart';
 import 'package:upendo_app/views/welcome_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -19,6 +21,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Restore the saved UI language before the first frame (defaults to sw).
+  await LocaleController.instance.load();
   // google_sign_in v7 must be initialised once before authenticate(). The
   // serverClientId is the Firebase project's web OAuth client, needed on
   // Android so the returned idToken is accepted by Firebase Auth.
@@ -104,9 +108,20 @@ class NguvuYaUpendoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Rebuilds the whole app when the user switches language in Account.
+    return ValueListenableBuilder<Locale>(
+      valueListenable: LocaleController.instance,
+      builder: (context, locale, _) => _buildApp(locale),
+    );
+  }
+
+  Widget _buildApp(Locale locale) {
     return MaterialApp(
       title: 'Moyo App',
       debugShowCheckedModeBanner: false,
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF8B2942),

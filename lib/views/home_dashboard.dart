@@ -13,9 +13,11 @@ import 'package:upendo_app/views/account_fragment.dart';
 import 'package:upendo_app/views/category_search_delegate.dart';
 import 'package:upendo_app/views/saved_fragment.dart';
 import 'package:upendo_app/views/notifications_screen.dart';
+import '../l10n/l10n.dart';
 import '../models/post_model.dart';
 import '../models/notification_model.dart';
 import '../models/conversation_model.dart';
+import '../models/category_group_model.dart';
 import '../models/category_model.dart';
 import '../services/post_service.dart';
 import '../services/category_service.dart';
@@ -23,6 +25,7 @@ import '../services/user_preferences.dart';
 import '../services/notification_service.dart';
 import '../services/conversation_service.dart';
 import '../utils/category_navigation.dart';
+import '../utils/category_tree.dart';
 import '../services/unread_badge_service.dart';
 import '../utils/share_app.dart';
 import '../widgets/post_stats_row.dart';
@@ -38,7 +41,9 @@ class HomeDashboard extends StatefulWidget {
 class _HomeDashboardState extends State<HomeDashboard> {
   int _currentIndex = 2;
   final PostService _postService = PostService();
-  final CategoryService _categoryService = CategoryService();
+  // Created once so the carousel's rebuilds (page dots, hot-posts paging)
+  // don't reattach the category listeners.
+  late final Stream<CategoryTree> _categoryTree = CategoryService().watchTree();
 
   final PageController _somoPageController =
       PageController(viewportFraction: 0.88);
@@ -51,7 +56,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   final ScrollController _hotScrollController = ScrollController();
   final UserPreferences _userPreferences = UserPreferences();
-  String _userName = 'Mtumiaji';
+  String? _userName;
   final GlobalKey<SavedFragmentState> _savedFragmentKey =
       GlobalKey<SavedFragmentState>();
 
@@ -181,11 +186,13 @@ class _HomeDashboardState extends State<HomeDashboard> {
         children: [
           _buildHeader(),
           const SizedBox(height: 28),
-          _buildSectionHeader('Somo la Leo!', onMore: () => _switchTab(0)),
+          _buildSectionHeader(context.l10n.homeTodayLesson,
+              onMore: () => _switchTab(0)),
           const SizedBox(height: 14),
           _buildSomoLaLeoSection(),
           const SizedBox(height: 28),
-          _buildSectionHeader('Mada za Moto!', onMore: () => _switchTab(0)),
+          _buildSectionHeader(context.l10n.homeHotTopics,
+              onMore: () => _switchTab(0)),
           const SizedBox(height: 14),
           _buildTopicsSlider(),
           const SizedBox(height: 110),
@@ -251,7 +258,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Habari, $_userName 👋',
+                            context.l10n.homeGreeting(
+                                _userName ?? context.l10n.userFallbackName),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                             style: const TextStyle(
@@ -262,9 +270,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'Karibu tujifunze kitu kipya leo',
-                            style: TextStyle(
+                          Text(
+                            context.l10n.homeSubtitle,
+                            style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 13,
                             ),
@@ -451,10 +459,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         const Icon(Icons.search_rounded,
                             color: Color(0xFF0077C2), size: 22),
                         const SizedBox(width: 10),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'Tafuta categories...',
-                            style: TextStyle(
+                            context.l10n.searchCategoriesHint,
+                            style: const TextStyle(
                               color: Color(0xFFADB5BD),
                               fontSize: 14,
                             ),
@@ -467,9 +475,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
                             color: const Color(0xFFEEF2FF),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Text(
-                            'Tafuta',
-                            style: TextStyle(
+                          child: Text(
+                            context.l10n.search,
+                            style: const TextStyle(
                               color: Color(0xFF0077C2),
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -521,9 +529,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: const Text(
-              'Ona zaidi →',
-              style: TextStyle(
+            child: Text(
+              context.l10n.seeMore,
+              style: const TextStyle(
                 color: Color(0xFF0077C2),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -539,38 +547,37 @@ class _HomeDashboardState extends State<HomeDashboard> {
   // Requirement #2: this section shows Categories (not individual posts) —
   // the associated posts live inside each category, same as Explore.
 
+  // Category groups come first, then main categories that aren't in any
+  // group — the same top level Explore shows (see CategoryTree). Before an
+  // admin creates any group this is exactly the old list of top-level
+  // categories.
   Widget _buildSomoLaLeoSection() {
-    return StreamBuilder<List<Category>>(
-      stream: _categoryService.getCategories(),
+    return StreamBuilder<CategoryTree>(
+      stream: _categoryTree,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return SizedBox(
+            height: 220,
+            child: Center(
+                child: Text(context.l10n.errorWithDetails('${snapshot.error}'))),
+          );
+        }
+
         if (!snapshot.hasData) {
           return _buildSomoLaLeoShimmer();
         }
 
-        if (snapshot.hasError) {
+        final tree = snapshot.data!;
+        final itemCount = tree.groups.length + tree.ungroupedMains.length;
+
+        if (itemCount == 0) {
           return SizedBox(
             height: 220,
-            child: Center(child: Text('Error: ${snapshot.error}')),
+            child: Center(child: Text(context.l10n.noCategoriesNow)),
           );
         }
 
-        final categories = snapshot.data!;
-        final topLevel =
-            categories.where((c) => c.parentId == null).toList();
-
-        if (topLevel.isEmpty) {
-          return const SizedBox(
-            height: 220,
-            child: Center(child: Text('Hakuna categories kwa sasa.')),
-          );
-        }
-
-        if (_currentSomoPage >= topLevel.length) _currentSomoPage = 0;
-
-        // Only used to decide, at tap time, which screen to push — same
-        // pattern as explore_fragment.dart.
-        final parentIdsWithChildren =
-            categories.map((c) => c.parentId).whereType<String>().toSet();
+        if (_currentSomoPage >= itemCount) _currentSomoPage = 0;
 
         return Column(
           children: [
@@ -578,23 +585,104 @@ class _HomeDashboardState extends State<HomeDashboard> {
               height: 220,
               child: PageView.builder(
                 controller: _somoPageController,
-                itemCount: topLevel.length,
+                itemCount: itemCount,
                 onPageChanged: (index) =>
                     setState(() => _currentSomoPage = index),
                 itemBuilder: (context, index) {
-                  final category = topLevel[index];
+                  if (index < tree.groups.length) {
+                    final group = tree.groups[index];
+                    return _buildSomoGroupCard(group, tree.mainsIn(group.id).length);
+                  }
+                  final category = tree.ungroupedMains[index - tree.groups.length];
                   return _buildSomoCategoryCard(
                     category,
-                    hasChildren: parentIdsWithChildren.contains(category.id),
+                    hasChildren: tree.hasChildren(category),
                   );
                 },
               ),
             ),
             const SizedBox(height: 8),
-            _buildPageDots(topLevel.length),
+            _buildPageDots(itemCount),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildSomoGroupCard(CategoryGroup group, int mainCount) {
+    return GestureDetector(
+      onTap: () => openCategoryGroup(context, group),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [group.color, group.color.withAlpha(180)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: group.color.withAlpha(80),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Center(
+                child: Icon(group.icon, color: Colors.white.withAlpha(50), size: 130),
+              ),
+              Positioned(
+                top: 14,
+                left: 14,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(230),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.layers_rounded, size: 14, color: group.color),
+                      const SizedBox(width: 4),
+                      Text(
+                        context.l10n.categoriesCount(mainCount),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: group.color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 20,
+                child: Text(
+                  group.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.bold,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -771,9 +859,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
     }
 
     if (_hotPosts.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 230,
-        child: Center(child: Text('Hakuna mada kwa sasa.')),
+        child: Center(child: Text(context.l10n.noTopicsNow)),
       );
     }
 
@@ -960,14 +1048,15 @@ class _HomeDashboardState extends State<HomeDashboard> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(0, Icons.explore_outlined, Icons.explore, 'Explore'),
-            _buildNavItem(
-                1, Icons.bookmark_border, Icons.bookmark, 'Saved'),
+            _buildNavItem(0, Icons.explore_outlined, Icons.explore,
+                context.l10n.navExplore),
+            _buildNavItem(1, Icons.bookmark_border, Icons.bookmark,
+                context.l10n.navSaved),
             _buildCenterHomeItem(),
-            _buildNavItem(
-                3, Icons.chat_bubble_outline, Icons.chat_bubble, 'Chat'),
-            _buildNavItem(
-                4, Icons.person_outline, Icons.person, 'Account'),
+            _buildNavItem(3, Icons.chat_bubble_outline, Icons.chat_bubble,
+                context.l10n.navChat),
+            _buildNavItem(4, Icons.person_outline, Icons.person,
+                context.l10n.navAccount),
           ],
         ),
       ),

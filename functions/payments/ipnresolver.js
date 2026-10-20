@@ -1,6 +1,8 @@
 const axios = require('axios');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { onRequest } = require('firebase-functions/v2/https');
+const { creditReferralCommissionSafely } = require('../wallet/commission');
+const { coversExpectedAmount } = require('./clickpesa');
 
 const CONSUMER_KEY    = "vNdwWW80VuOrkiozwtGoI0SFJb+oRuDk";
 const CONSUMER_SECRET = "JGmtvImHCX1t29RP/RmrWlGiz58=";
@@ -59,7 +61,24 @@ const resolvePayment = onRequest(
             }
 
             const subscription = subscriptionSnap.data();
-            const isCompleted = trans.payment_status_description?.toLowerCase() === 'completed';
+
+            // Never downgrade or re-process a completed payment (late or
+            // repeated IPN). The commission call is idempotent, so it's
+            // retried here in case it failed the first time.
+            if (subscription.status === "Completed") {
+                await creditReferralCommissionSafely(OrderMerchantReference, db);
+                return res.json({ error: null, status: "Completed", activated: true, alreadyCompleted: true });
+            }
+
+            const isPaid = trans.payment_status_description?.toLowerCase() === 'completed';
+            // Same rule as ClickPesa: the verified amount must cover the
+            // package price recorded at checkout, or nothing is activated.
+            const isUnderpaid = isPaid && !coversExpectedAmount(subscription, trans.amount);
+            const isCompleted = isPaid && !isUnderpaid;
+            if (isUnderpaid) {
+                console.error("resolvePayment: underpaid", OrderMerchantReference,
+                    { paid: trans.amount, expected: subscription.amount });
+            }
             const batch = db.batch();
 
             // Always update the subscription with latest PesaPal status
@@ -70,7 +89,8 @@ const resolvePayment = onRequest(
                 message: trans.message,
                 payment_account: trans.payment_account,
                 merchant_reference: trans.merchant_reference,
-                status: isCompleted ? "Completed" : trans.payment_status_description,
+                status: isCompleted ? "Completed"
+                    : (isUnderpaid ? "Underpaid" : trans.payment_status_description),
                 updated_at: FieldValue.serverTimestamp(),
             }, { merge: true });
 
@@ -95,6 +115,12 @@ const resolvePayment = onRequest(
             }
 
             await batch.commit();
+
+            // 1% of this payment to whoever referred the payer, once per
+            // subscription even if PesaPal repeats the IPN.
+            if (isCompleted) {
+                await creditReferralCommissionSafely(OrderMerchantReference, db);
+            }
 
             return res.json({
                 error: null,

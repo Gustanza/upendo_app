@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/category_group_model.dart';
 import '../models/category_model.dart';
 import 'unread_badge.dart';
 
@@ -91,6 +92,104 @@ class CategoryGridTile extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Grid tile for a category group (the level above main categories) — same
+/// footprint as CategoryGridTile, but a rounded square with a stacked
+/// "layers" badge so groups read as containers rather than topics.
+class CategoryGroupTile extends StatelessWidget {
+  final CategoryGroup group;
+  final int mainCount;
+  final VoidCallback onTap;
+
+  const CategoryGroupTile({
+    super.key,
+    required this.group,
+    required this.mainCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [group.color, group.color.withAlpha(190)],
+                  ),
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: [
+                    BoxShadow(
+                      color: group.color.withValues(alpha: 0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(group.icon, color: Colors.white, size: 44),
+                ),
+              ),
+              Positioned(
+                right: -4,
+                bottom: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: group.color, width: 1.5),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.layers_rounded, size: 11, color: group.color),
+                      const SizedBox(width: 2),
+                      Text(
+                        '$mainCount',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: group.color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Text(
+                group.name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                   color: Colors.black87,
                 ),
               ),

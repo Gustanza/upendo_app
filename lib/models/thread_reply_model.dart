@@ -19,7 +19,7 @@ class ThreadReplyModel {
     return ThreadReplyModel(
       id: id,
       authorId: data['authorId'] ?? '',
-      authorName: data['authorName'] ?? 'Mtumiaji',
+      authorName: data['authorName'] ?? '',
       text: data['text'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );

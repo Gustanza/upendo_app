@@ -475,7 +475,7 @@ async function save() {
   border-bottom: 1px solid #f0f2f8;
   flex-shrink: 0;
 }
-.drawer-eyebrow { margin: 0 0 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #3b4cca; }
+.drawer-eyebrow { margin: 0 0 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #8b2942; }
 .drawer-title { margin: 0; font-size: 18px; font-weight: 700; color: #1a1d2e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 380px; }
 
 .close-btn {
@@ -502,7 +502,7 @@ async function save() {
   font-size: 14px; color: #1a1d2e; background: #fafbff; outline: none;
   transition: border-color 0.15s; font-family: inherit; width: 100%; box-sizing: border-box;
 }
-.input:focus { border-color: #3b4cca; background: #fff; }
+.input:focus { border-color: #8b2942; background: #fff; }
 .textarea { resize: vertical; min-height: 72px; }
 
 .type-tabs { display: flex; gap: 8px; }
@@ -511,8 +511,8 @@ async function save() {
   background: #fafbff; cursor: pointer; font-size: 13px; font-weight: 600; color: #6b7280;
   display: flex; flex-direction: column; align-items: center; gap: 4px; transition: all 0.15s;
 }
-.type-tab:hover { border-color: #3b4cca; color: #3b4cca; }
-.type-tab.active { border-color: #3b4cca; background: #eef0fd; color: #3b4cca; }
+.type-tab:hover { border-color: #8b2942; color: #8b2942; }
+.type-tab.active { border-color: #8b2942; background: #f8eaed; color: #8b2942; }
 .type-tab-icon { font-size: 20px; }
 
 .poll-options { display: flex; flex-direction: column; gap: 8px; }
@@ -540,7 +540,7 @@ async function save() {
 .toggle-wrap { position: relative; flex-shrink: 0; }
 .toggle-input { position: absolute; opacity: 0; width: 0; height: 0; }
 .toggle-track { width: 40px; height: 22px; border-radius: 11px; background: #d1d5db; transition: background 0.2s; position: relative; }
-.toggle-input:checked ~ .toggle-track { background: #3b4cca; }
+.toggle-input:checked ~ .toggle-track { background: #8b2942; }
 .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.2s; }
 .toggle-input:checked ~ .toggle-track .toggle-thumb { transform: translateX(18px); }
 
@@ -554,10 +554,10 @@ async function save() {
 .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-primary {
-  padding: 9px 22px; border-radius: 8px; border: none; background: #3b4cca; color: #fff;
+  padding: 9px 22px; border-radius: 8px; border: none; background: #8b2942; color: #fff;
   font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s;
 }
-.btn-primary:hover:not(:disabled) { background: #2d3ba8; }
+.btn-primary:hover:not(:disabled) { background: #6e1f33; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .btn-spinner {
@@ -587,7 +587,7 @@ async function save() {
   text-align: left;
   transition: border-color 0.15s;
 }
-.cat-trigger:hover, .cat-trigger:focus { border-color: #3b4cca; outline: none; }
+.cat-trigger:hover, .cat-trigger:focus { border-color: #8b2942; outline: none; }
 
 .cat-trigger-icon {
   width: 26px; height: 26px;
@@ -624,7 +624,7 @@ async function save() {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid #eef0f8;
+  border-bottom: 1px solid #f8eaed;
 }
 .cat-search-icon { width: 15px; height: 15px; color: #9ca3af; flex-shrink: 0; }
 .cat-search-input {
@@ -665,7 +665,7 @@ async function save() {
   transition: background 0.1s;
 }
 .cat-option:hover { background: #f5f6ff; }
-.cat-option.active { background: #eef0fd; color: #3b4cca; }
+.cat-option.active { background: #f8eaed; color: #8b2942; }
 
 .cat-option-icon {
   width: 26px; height: 26px;
@@ -685,5 +685,5 @@ async function save() {
 
 .cat-option-name { flex: 1; }
 
-.cat-check { width: 14px; height: 14px; color: #3b4cca; flex-shrink: 0; }
+.cat-check { width: 14px; height: 14px; color: #8b2942; flex-shrink: 0; }
 </style>

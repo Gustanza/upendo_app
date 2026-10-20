@@ -1,0 +1,583 @@
+{
+  "@@locale": "sw",
+  "appName": "Moyo App",
+  "continueButton": "ENDELEA",
+  "welcomeTitle": "Karibu\nKatika Moyo App",
+  "welcomeWhatFor": "Hii ni App kwa ajili gani",
+  "welcomeIntro": "Moyo App ni chanzo chako cha habari,\nmafunzo na msukumo wa kila siku.\nTunakuletea maudhui ya moyo wazi.",
+  "welcomeBenefitTitle": "Humu utafaidika nini?",
+  "welcomeBenefitBody": "Pata maudhui mapya kila siku, jifunze,\nna ushirikiane na jamii yenye upendo\nna mioyo iliyojaa furaha na imani.",
+  "authTagline": "Jifunze · Kukua · Kupenda",
+  "authWelcome": "Karibu Moyo App",
+  "authContinueWithGoogleHint": "Endelea kwa akaunti yako ya Google",
+  "authGoogleButton": "ENDELEA NA GOOGLE",
+  "authTermsPrefix": "Kwa kuendelea unakubaliana na ",
+  "authTermsLink": "Vigezo na masharti",
+  "authGoogleFailed": "Imeshindwa kuingia na Google",
+  "authSignInError": "Hitilafu imetokea wakati wa kuingia",
+  "profileFillAll": "Tafadhali jaza nafasi zote",
+  "saveFailed": "Imeshindwa kuhifadhi: {error}",
+  "@saveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "searchHint": "Tafuta…",
+  "profileSetupTitle": "Kamilisha Taarifa Zako",
+  "profileSetupSubtitle": "Tunahitaji taarifa chache kabla ya kuendelea",
+  "signedInAs": "Umeingia kama {email}",
+  "@signedInAs": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "useAnotherGoogleAccount": "Tumia akaunti nyingine ya Google",
+  "fullName": "Jina Kamili",
+  "country": "Nchi",
+  "chooseYourCountry": "Chagua nchi yako",
+  "chooseCountry": "Chagua Nchi",
+  "region": "Mkoa",
+  "chooseYourRegion": "Chagua mkoa wako",
+  "chooseRegion": "Chagua Mkoa",
+  "regionOrState": "Mkoa / Jimbo",
+  "chooseCountryFirst": "Chagua nchi kwanza",
+  "yourRegionOrState": "Mkoa au jimbo lako",
+  "saveAndContinue": "HIFADHI NA ENDELEA",
+  "phoneNumber": "Namba ya Simu",
+  "paymentLoadPackagesFailed": "Imeshindwa kupakua vifurushi. Jaribu tena.",
+  "errorOccurred": "Hitilafu imetokea.",
+  "errorCheckNetwork": "Hitilafu imetokea. Angalia mtandao na ujaribu tena.",
+  "paymentFailedMessage": "Malipo hayakufanikiwa.",
+  "paymentNotConfirmedYet": "Malipo bado hayajathibitishwa. Subiri kidogo.",
+  "paymentSupportPrompt": "Unahitaji msaada wa malipo? Wasiliana nasi",
+  "paymentConfirmPhone": "Thibitisha namba ya simu utakayolipia",
+  "paymentPinPrompt": "Utapokea ujumbe wa kuweka PIN kwenye namba hii",
+  "payNow": "LIPIA SASA",
+  "goBack": "Rudi nyuma",
+  "paymentPreparing": "Inaandaa malipo…",
+  "paymentCheckPhone": "Angalia simu yako",
+  "paymentWaitingBody": "Tumetuma ombi la malipo kwenye simu yako. Weka PIN yako kukamilisha malipo. Programu itafunguka moja kwa moja baada ya malipo kukubaliwa.",
+  "paymentDone": "Nimemaliza malipo",
+  "paymentFailedTitle": "Malipo hayakufanikiwa",
+  "tryAgain": "Jaribu tena.",
+  "tryAgainButton": "JARIBU TENA",
+  "paymentNoPackages": "Hakuna vifurushi vya usajili kwa sasa.\nTafadhali wasiliana na msimamizi.",
+  "paymentChoosePackage": "Chagua kifurushi cha usajili",
+  "showFewer": "Onyesha vichache",
+  "paymentShowMorePackages": "Ona vifurushi vingine ({count})",
+  "@paymentShowMorePackages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "daysCount": "{count} siku",
+  "@daysCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeTodayLesson": "Somo la Leo!",
+  "homeHotTopics": "Mada za Moto!",
+  "homeGreeting": "Habari, {name} 👋",
+  "@homeGreeting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "userFallbackName": "Mtumiaji",
+  "homeSubtitle": "Karibu tujifunze kitu kipya leo",
+  "searchCategoriesHint": "Tafuta categories...",
+  "search": "Tafuta",
+  "seeMore": "Ona zaidi →",
+  "errorWithDetails": "Hitilafu: {error}",
+  "@errorWithDetails": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noCategoriesNow": "Hakuna categories kwa sasa.",
+  "noTopicsNow": "Hakuna mada kwa sasa.",
+  "navExplore": "Gundua",
+  "navSaved": "Hifadhi",
+  "navChat": "Gumzo",
+  "navAccount": "Akaunti",
+  "logoutConfirmTitle": "Toka?",
+  "logoutConfirmBody": "Je, una uhakika unataka kutoka kwenye akaunti?",
+  "no": "Hapana",
+  "yesLogout": "Ndiyo, Toka",
+  "location": "Mahali",
+  "accountActive": "Akaunti Hai",
+  "accountInactive": "Akaunti Imezimwa",
+  "yourSubscription": "Usajili Wako",
+  "statusActive": "Hai",
+  "statusNone": "Haina",
+  "subscriptionPackage": "Kifurushi cha Usajili",
+  "expiresOn": "Unaisha: {date}",
+  "@expiresOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "timeRemaining": "Muda uliobaki",
+  "renewSubscription": "Fanya Upya Usajili",
+  "noActiveSubscription": "Huna usajili\nunaofanya kazi",
+  "subscribePrompt": "Jiandikishe ili uendelee\nkufurahia maudhui yetu.",
+  "subscribeNow": "Jiandikishe Sasa",
+  "logout": "Toka Kwenye Akaunti",
+  "savedToast": "Imehifadhiwa!",
+  "removedToast": "Imeondolewa!",
+  "audioTrack": "Wimbo",
+  "comments": "Maoni",
+  "commentsWithCount": "Maoni ({count})",
+  "@commentsWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noCommentsYet": "Hakuna maoni bado.",
+  "writeCommentHint": "Andika maoni...",
+  "savedTitle": "Alamisho",
+  "savedSubtitle": "Mada ulizohifadhi kwa ajili ya baadaye",
+  "savedEmpty": "Hujachagua mada bado.",
+  "postNoLongerAvailable": "Chapisho hili halipatikani tena.",
+  "notificationsTitle": "Taarifa",
+  "noNotificationsYet": "Hakuna taarifa bado.",
+  "searchFailed": "Imeshindwa kutafuta: {error}",
+  "@searchFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "openConversationFailed": "Imeshindwa kufungua mazungumzo: {error}",
+  "@openConversationFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "newMessage": "Ujumbe Mpya",
+  "searchUserHint": "Tafuta jina la mtumiaji...",
+  "newMessagePrompt": "Andika jina la mtu unayetaka kumtumia ujumbe",
+  "noUserFound": "Hakuna mtumiaji aliyepatikana.",
+  "searchCategoryPrompt": "Andika jina la category kutafuta",
+  "categoryNotFound": "Category haijapatikana",
+  "passwordProtected": "Imefungwa kwa password",
+  "searchTopicsHint": "Tafuta mada...",
+  "searchTopicPrompt": "Andika jina la mada kutafuta",
+  "topicNotFound": "Mada haijapatikana",
+  "categoryPasswordPrompt": "Kipengele hiki kimefungwa. Weka password ili kuendelea.",
+  "password": "Password",
+  "incorrectPassword": "Password si sahihi",
+  "cancel": "Ghairi",
+  "unlock": "Fungua",
+  "openAppFailed": "Imeshindwa kufungua programu husika",
+  "callNumber": "Piga simu",
+  "messageOnWhatsApp": "Tuma ujumbe WhatsApp",
+  "copyNumber": "Nakili namba",
+  "numberCopied": "Namba imenakiliwa",
+  "sendFailed": "Imeshindwa kutuma: {error}",
+  "@sendFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteFailed": "Imeshindwa kufuta: {error}",
+  "@deleteFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "pollResponsesCount": "{count} wamejibu",
+  "@pollResponsesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pollAnswerHint": "Andika jibu lako...",
+  "send": "Tuma",
+  "pollRetract": "Futa jibu",
+  "save": "Hifadhi",
+  "pollYourAnswer": "Jibu lako:",
+  "edit": "Badilisha",
+  "delete": "Futa",
+  "pollQuestionHint": "Andika swali lako...",
+  "pollMultipleChoice": "Chaguo Nyingi",
+  "pollOpenText": "Jibu la Maandishi",
+  "pollOptionN": "Chaguo {n}",
+  "@pollOptionN": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "pollAddOption": "Ongeza chaguo",
+  "pollIncomplete": "Jaza swali la kura kikamilifu",
+  "timeJustNow": "Sasa hivi",
+  "timeMinutes": "{n} dak",
+  "@timeMinutes": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "timeHours": "{n} saa",
+  "@timeHours": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "timeDays": "{n} siku",
+  "@timeDays": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "timeWeeks": "{n} wiki",
+  "@timeWeeks": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "shareAppText": "Jiunge nami kwenye Moyo App — jifunze, kua na upende! Pakua hapa: {url}",
+  "@shareAppText": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "shareAppSubject": "Pakua Moyo App",
+  "shareReferralText": "Jiunge nami kwenye Moyo App — jifunze, kua na upende! Tumia namba yangu ya mwaliko {code} unapojisajili. Pakua hapa: {url}",
+  "@shareReferralText": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      },
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "messagesTitle": "Ujumbe",
+  "noConversationsYet": "Hakuna mazungumzo bado.",
+  "startConversation": "Anza mazungumzo",
+  "deleteChatTitle": "Futa mazungumzo na {name}?",
+  "@deleteChatTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteChatBody": "Mazungumzo haya yatafutwa kwako tu. Mwenzako bado ataona ujumbe wote. Akikutumia ujumbe mpya, mazungumzo yatarudi yakiwa na ujumbe mpya tu.",
+  "chatDeleted": "Mazungumzo yamefutwa",
+  "noMessagesYet": "Hakuna ujumbe bado. Kuwa wa kwanza kuandika!",
+  "noMessagesStartConversation": "Hakuna ujumbe bado. Anza mazungumzo!",
+  "writeMessageHint": "Andika ujumbe...",
+  "deleteMessageTitle": "Futa ujumbe huu?",
+  "cannotBeUndone": "Hatua hii haiwezi kutenduliwa.",
+  "uploadingPercent": "Inapakia {percent}%",
+  "@uploadingPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "attach": "Ambatisha",
+  "poll": "Kura",
+  "attachmentTypeNotAllowed": "Aina hii ya faili hairuhusiwi hapa",
+  "attachmentsMax": "Huwezi kuongeza viambatisho zaidi ya {count}",
+  "@attachmentsMax": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "imagesMax": "Unaweza kuweka picha {count} tu kwa pamoja",
+  "@imagesMax": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "oneVideoOnly": "Unaweza kuweka video moja tu",
+  "videoMaxMinutes": "Video isizidi dakika {minutes}",
+  "@videoMaxMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "fileTooLarge": "Faili lisizidi MB {mb}",
+  "@fileTooLarge": {
+    "placeholders": {
+      "mb": {
+        "type": "int"
+      }
+    }
+  },
+  "videoReadFailed": "Imeshindwa kusoma video hii",
+  "attachImages": "Picha (hadi {count})",
+  "@attachImages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attachVideo": "Video",
+  "attachVideoMax": "Video (isizidi dakika {minutes})",
+  "@attachVideoMax": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attachAudio": "Sauti",
+  "attachAudioMax": "Sauti (isizidi MB {mb})",
+  "@attachAudioMax": {
+    "placeholders": {
+      "mb": {
+        "type": "int"
+      }
+    }
+  },
+  "attachPdf": "PDF",
+  "attachPdfMax": "PDF (isizidi MB {mb})",
+  "@attachPdfMax": {
+    "placeholders": {
+      "mb": {
+        "type": "int"
+      }
+    }
+  },
+  "pdfDocument": "Hati ya PDF",
+  "videoPlaybackFailed": "Imeshindwa kucheza video",
+  "audioPlaybackFailed": "Imeshindwa kucheza sauti",
+  "audioClip": "Sauti",
+  "openLinkFailed": "Imeshindwa kufungua kiungo",
+  "communityWall": "Ukuta wa Jumuiya",
+  "whatsOnYourMind": "Unafikiria nini?",
+  "noPostsYet": "Hakuna chapisho bado. Kuwa wa kwanza kuchapisha!",
+  "deletePostTitle": "Futa chapisho?",
+  "writePost": "Andika Chapisho",
+  "publish": "Chapisha",
+  "discussion": "Mazungumzo",
+  "sendMessage": "Tuma ujumbe",
+  "noRepliesYet": "Hakuna majibu bado. Kuwa wa kwanza!",
+  "writeReplyHint": "Andika jibu...",
+  "addLink": "Ongeza kiungo",
+  "linkHint": "https://mfano.com",
+  "add": "Ongeza",
+  "invalidLink": "Kiungo si sahihi",
+  "linksMax": "Unaweza kuweka viungo {count} tu",
+  "@linksMax": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "exploreTitle": "Chagua Mada\nyako pendwa",
+  "exploreSubtitle": "Jifunze kwa Video, Sauti, Soma na Muziki",
+  "categoryGroupsTitle": "Makundi",
+  "otherCategoriesTitle": "Mada Nyingine",
+  "chooseSubcategory": "Chagua kipengele unachotaka",
+  "chooseCategory": "Chagua mada unayotaka",
+  "categoriesCount": "Mada {count}",
+  "@categoriesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "topicsFound": "Mada {count} zilizopatikana",
+  "@topicsFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noTopicsYet": "Hakuna mada bado",
+  "noTopicsYetBody": "Tunarudi hivi punde na mada mpya.",
+  "tabTopics": "Mada",
+  "tabCommunity": "Jamii",
+  "tabChat": "Gumzo",
+  "tabGroups": "Vikundi",
+  "tabPosts": "Machapisho",
+  "tabMembers": "Wanachama",
+  "createGroup": "Unda Kikundi",
+  "editGroup": "Hariri Kikundi",
+  "deleteGroup": "Futa Kikundi",
+  "noGroupsYet": "Hakuna vikundi bado. Unda cha kwanza!",
+  "membersCount": "Wanachama {count}",
+  "@membersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "groupNameRequired": "Weka jina la kikundi",
+  "groupPhotoHint": "Gusa kuweka picha ya kikundi",
+  "groupName": "Jina la kikundi",
+  "groupDescription": "Maelezo ya kikundi",
+  "groupNotFound": "Kikundi hiki hakipo tena.",
+  "joinGroup": "Jiunge",
+  "leaveGroup": "Toka",
+  "leaveGroupTitle": "Toka kwenye kikundi?",
+  "leaveGroupBody": "Hutaona tena machapisho na gumzo la kikundi hiki hadi ujiunge tena.",
+  "deleteGroupTitle": "Futa kikundi?",
+  "deleteGroupBody": "Machapisho yote, gumzo na wanachama wa kikundi hiki watafutwa. Hatua hii haiwezi kutenduliwa.",
+  "joinGroupFailed": "Imeshindwa kujiunga na kikundi hiki.",
+  "joinToSeePosts": "Jiunge na kikundi ili kuona na kuandika machapisho na kushiriki gumzo.",
+  "groupOwner": "Mmiliki",
+  "groupCreatedBy": "Kimeundwa na {name}",
+  "@groupCreatedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinedAgo": "Alijiunga {time}",
+  "@joinedAgo": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "removeMember": "Ondoa",
+  "removeMemberTitle": "Ondoa {name}?",
+  "@removeMemberTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeMemberBody": "Ataondolewa kwenye kikundi na hataweza kujiunga tena.",
+  "language": "Lugha",
+  "chooseLanguage": "Chagua lugha",
+  "copy": "Nakili",
+  "share": "Shiriki",
+  "referralCodeTitle": "Namba Yako ya Mwaliko",
+  "referralCodeExplainer": "Waalike marafiki kwa namba hii. Kila wanapolipia usajili, unapata {percent}% ya malipo yao kwenye pochi yako.",
+  "@referralCodeExplainer": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "referralGenerate": "Tengeneza namba yangu",
+  "referralGenerateFailed": "Imeshindwa kutengeneza namba: {error}",
+  "@referralGenerateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "referralCodeCopied": "Namba ya mwaliko imenakiliwa",
+  "referralCodeOptional": "Namba ya mwaliko (si lazima)",
+  "referralCodeHint": "Mf. AB2C",
+  "referralErrorFormat": "Namba ya mwaliko ina herufi au tarakimu 4.",
+  "referralErrorNotFound": "Namba hii ya mwaliko haipo.",
+  "referralErrorOwnCode": "Huwezi kutumia namba yako mwenyewe.",
+  "referralErrorAlreadyUsed": "Tayari umeshatumia namba ya mwaliko.",
+  "referralErrorNotNew": "Namba ya mwaliko ni kwa watumiaji wapya tu.",
+  "referralErrorNoProfile": "Kamilisha taarifa zako kwanza.",
+  "referralErrorGeneric": "Imeshindwa kutumia namba ya mwaliko. Jaribu tena.",
+  "walletTitle": "Pochi Yangu",
+  "walletBalance": "Salio",
+  "walletPending": "Inasubiri kutolewa",
+  "walletTotalEarned": "Jumla ya mapato",
+  "walletReferrals": "Uliowaalika",
+  "walletHistory": "Historia",
+  "noWalletTransactionsYet": "Bado hakuna miamala.",
+  "withdrawalRequests": "Maombi ya kutoa pesa",
+  "noWithdrawalsYet": "Hujaomba kutoa pesa bado.",
+  "withdrawalStatusPending": "Inasubiri",
+  "withdrawalStatusPaid": "Imelipwa",
+  "withdrawalStatusRejected": "Imekataliwa",
+  "txReferralCredit": "Kamisheni ya mwaliko — {name}",
+  "@txReferralCredit": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "txWithdrawalRequested": "Ombi la kutoa pesa",
+  "txWithdrawalRefunded": "Ombi limekataliwa — pesa imerudishwa",
+  "txWithdrawalPaid": "Pesa imelipwa",
+  "withdraw": "Toa Pesa",
+  "withdrawMinimum": "Kiwango cha chini cha kutoa ni {amount}",
+  "@withdrawMinimum": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "withdrawPhoneLabel": "Namba ya simu / ya malipo",
+  "withdrawAmountLabel": "Kiasi",
+  "withdrawNotesLabel": "Maelezo (si lazima)",
+  "withdrawIdTypeLabel": "Aina ya kitambulisho",
+  "idTypeNational": "Kitambulisho cha Taifa (NIDA)",
+  "idTypeDriversLicense": "Leseni ya udereva",
+  "idTypePassport": "Pasipoti",
+  "withdrawIdPhotoLabel": "Picha ya kitambulisho",
+  "takePhoto": "Piga picha",
+  "chooseFromGallery": "Chagua picha",
+  "withdrawSubmit": "TUMA OMBI",
+  "withdrawSubmitted": "Ombi lako limetumwa. Utajulishwa likishashughulikiwa.",
+  "withdrawErrorBalance": "Salio lako halitoshi.",
+  "withdrawErrorAmount": "Weka kiasi sahihi.",
+  "withdrawErrorPhone": "Weka namba sahihi ya simu.",
+  "withdrawErrorName": "Weka jina lako kamili.",
+  "withdrawErrorIdPhoto": "Weka picha ya kitambulisho chako.",
+  "paymentUnderpaid": "Kiasi kilicholipwa ni kidogo kuliko bei ya kifurushi, kwa hiyo usajili haujawashwa. Wasiliana nasi kwa msaada."
+}

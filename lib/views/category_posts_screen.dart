@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 import '../models/category_model.dart';
 import '../models/poll_model.dart';
 import '../models/post_model.dart';
@@ -9,8 +10,15 @@ import 'post_detail_screen.dart';
 
 class CategoryPostsScreen extends StatefulWidget {
   final Category category;
+  // true when shown as the "Topics" tab of SubcategoryHubScreen, which
+  // draws its own header — then only the post list is built here.
+  final bool embedded;
 
-  const CategoryPostsScreen({super.key, required this.category});
+  const CategoryPostsScreen({
+    super.key,
+    required this.category,
+    this.embedded = false,
+  });
 
   @override
   State<CategoryPostsScreen> createState() => _CategoryPostsScreenState();
@@ -61,18 +69,18 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final body = _isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : _posts.isEmpty
+        ? _buildEmptyState()
+        : _buildPostsList();
+    if (widget.embedded) return body;
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: Column(
         children: [
           _buildHeader(context),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _posts.isEmpty
-                ? _buildEmptyState()
-                : _buildPostsList(),
-          ),
+          Expanded(child: body),
         ],
       ),
     );
@@ -123,7 +131,7 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                       ),
                     ),
                     Text(
-                      '${_posts.length} Mada zilizopatikana',
+                      context.l10n.topicsFound(_posts.length),
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
@@ -146,18 +154,18 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
         children: [
           Icon(Icons.folder_open_outlined, size: 80, color: Colors.grey[300]),
           const SizedBox(height: 20),
-          const Text(
-            'Hakuna mada bado',
-            style: TextStyle(
+          Text(
+            context.l10n.noTopicsYet,
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.grey,
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
-            'Tunarudi hivi punde na mada mpya.',
-            style: TextStyle(color: Colors.grey),
+          Text(
+            context.l10n.noTopicsYetBody,
+            style: const TextStyle(color: Colors.grey),
           ),
         ],
       ),

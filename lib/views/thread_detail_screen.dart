@@ -1,29 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../l10n/l10n.dart';
 import '../models/poll_model.dart';
 import '../models/thread_post_model.dart';
 import '../models/thread_reply_model.dart';
+import '../models/thread_scope.dart';
 import '../services/conversation_service.dart';
 import '../services/thread_interaction_service.dart';
 import '../services/thread_post_service.dart';
+import '../utils/display_name.dart';
+import '../utils/links.dart';
 import '../utils/time_ago.dart';
 import '../widgets/attachment_views.dart';
+import '../widgets/linkified_text.dart';
 import '../widgets/poll_view.dart';
 import '../widgets/thread_stats_row.dart';
 import 'conversation_screen.dart';
 
 class ThreadDetailScreen extends StatefulWidget {
   final ThreadPostModel post;
-  const ThreadDetailScreen({super.key, required this.post});
+  // Which feed the post belongs to — the community wall unless opened from
+  // a subcategory or user-group feed.
+  final ThreadScope scope;
+  const ThreadDetailScreen({
+    super.key,
+    required this.post,
+    this.scope = ThreadScope.wall,
+  });
 
   @override
   State<ThreadDetailScreen> createState() => _ThreadDetailScreenState();
 }
 
 class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
-  final ThreadInteractionService _interactionService = ThreadInteractionService();
-  final ThreadPostService _postService = ThreadPostService();
+  late final ThreadInteractionService _interactionService =
+      ThreadInteractionService(postsPath: widget.scope.postsPath);
+  late final ThreadPostService _postService = ThreadPostService(scope: widget.scope);
   final TextEditingController _replyController = TextEditingController();
   bool _isSending = false;
 
@@ -40,25 +53,31 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
     try {
       await _interactionService.addReply(widget.post.id, text);
       _replyController.clear();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(context.l10n.sendFailed('$e'))));
+      }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
   }
 
   Future<void> _confirmDeletePost() async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Futa chapisho?'),
-        content: const Text('Hatua hii haiwezi kutenduliwa.'),
+        title: Text(l10n.deletePostTitle),
+        content: Text(l10n.cannotBeUndone),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Ghairi'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Futa', style: TextStyle(color: Colors.red)),
+            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -70,6 +89,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Future<void> _messageAuthor() async {
+    final otherName = displayName(widget.post.authorName, context.l10n);
     final conversationId = await ConversationService().getOrCreateConversation(
       otherUid: widget.post.authorId,
       otherName: widget.post.authorName,
@@ -79,7 +99,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       MaterialPageRoute(
         builder: (_) => ConversationScreen(
           conversationId: conversationId,
-          otherName: widget.post.authorName,
+          otherName: otherName,
         ),
       ),
     );
@@ -88,7 +108,9 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    final isOwner = widget.post.authorId == currentUid;
+    final isAuthor = widget.post.authorId == currentUid;
+    final canDelete =
+        widget.scope.canDelete(authorId: widget.post.authorId, myUid: currentUid);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -96,18 +118,19 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1A1D2E),
         elevation: 0,
-        title: const Text('Mazungumzo'),
+        title: Text(context.l10n.discussion),
         actions: [
-          if (isOwner)
-            IconButton(
-              onPressed: _confirmDeletePost,
-              icon: const Icon(Icons.delete_outline),
-            )
-          else
+          if (!isAuthor)
             IconButton(
               onPressed: _messageAuthor,
               icon: const Icon(Icons.chat_bubble_outline),
-              tooltip: 'Tuma ujumbe',
+              tooltip: context.l10n.sendMessage,
+            ),
+          if (canDelete)
+            IconButton(
+              onPressed: _confirmDeletePost,
+              tooltip: context.l10n.delete,
+              icon: const Icon(Icons.delete_outline),
             ),
         ],
       ),
@@ -130,12 +153,12 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                     }
                     final replies = snapshot.data ?? [];
                     if (replies.isEmpty) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
                         child: Center(
                           child: Text(
-                            'Hakuna majibu bado. Kuwa wa kwanza!',
-                            style: TextStyle(color: Colors.grey),
+                            context.l10n.noRepliesYet,
+                            style: const TextStyle(color: Colors.grey),
                           ),
                         ),
                       );
@@ -158,6 +181,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
 
   Widget _buildPostHeader() {
     final post = widget.post;
+    final author = displayName(post.authorName, context.l10n);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -167,7 +191,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
               radius: 22,
               backgroundColor: Colors.blue.shade100,
               child: Text(
-                post.authorName.isNotEmpty ? post.authorName[0].toUpperCase() : '?',
+                nameInitial(author),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.blue.shade800,
@@ -180,7 +204,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    post.authorName,
+                    author,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                   Text(
@@ -201,15 +225,15 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
               options: post.pollOptions,
             ),
             responsesRef: FirebaseFirestore.instance
-                .collection('threadPosts')
+                .collection(widget.scope.postsPath)
                 .doc(post.id)
                 .collection('pollResponses'),
           ),
         ] else if (post.text.isNotEmpty) ...[
           const SizedBox(height: 14),
-          Text(
+          LinkifiedText(
             post.text,
-            style: const TextStyle(fontSize: 16, height: 1.4),
+            style: const TextStyle(fontSize: 16, height: 1.4, color: Colors.black87),
           ),
         ],
         if (post.attachments.isNotEmpty) ...[
@@ -226,9 +250,15 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             ),
           ),
         ],
+        for (final link in post.links)
+          if (normalizeUrl(link) case final uri?) ...[
+            const SizedBox(height: 10),
+            LinkPreviewCard(url: uri),
+          ],
         const SizedBox(height: 14),
         ThreadStatsRow(
           postId: post.id,
+          postsPath: widget.scope.postsPath,
           likeCount: post.likeCount,
           commentCount: post.commentCount,
           iconColor: Colors.grey.shade600,
@@ -239,7 +269,8 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Widget _buildReplyTile(ThreadReplyModel reply, String? currentUid) {
-    final isOwner = reply.authorId == currentUid;
+    final canDelete = widget.scope.canDelete(authorId: reply.authorId, myUid: currentUid);
+    final author = displayName(reply.authorName, context.l10n);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -249,7 +280,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             radius: 16,
             backgroundColor: const Color(0xFFE8EAF6),
             child: Text(
-              reply.authorName.isNotEmpty ? reply.authorName[0].toUpperCase() : '?',
+              nameInitial(author),
               style: const TextStyle(color: Color(0xFF0077C2), fontSize: 12),
             ),
           ),
@@ -261,7 +292,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                 Row(
                   children: [
                     Text(
-                      reply.authorName,
+                      author,
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     const SizedBox(width: 8),
@@ -272,11 +303,14 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(reply.text, style: const TextStyle(fontSize: 14, height: 1.3)),
+                LinkifiedText(
+                  reply.text,
+                  style: const TextStyle(fontSize: 14, height: 1.3, color: Colors.black87),
+                ),
               ],
             ),
           ),
-          if (isOwner)
+          if (canDelete)
             GestureDetector(
               onTap: () => _interactionService.deleteReply(widget.post.id, reply.id),
               child: const Icon(Icons.delete_outline, size: 18, color: Colors.grey),
@@ -295,7 +329,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -309,7 +343,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                 // Matches the replies text cap in firestore.rules.
                 maxLength: 1000,
                 decoration: InputDecoration(
-                  hintText: 'Andika jibu...',
+                  hintText: context.l10n.writeReplyHint,
                   counterText: '',
                   filled: true,
                   fillColor: Colors.grey.shade100,

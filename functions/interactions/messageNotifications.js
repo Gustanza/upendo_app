@@ -11,6 +11,7 @@ function attachmentLabel(attachments) {
   if (types.has('image')) return attachments.length > 1 ? `📷 Picha ${attachments.length}` : '📷 Picha';
   if (types.has('video')) return '🎥 Video';
   if (types.has('pdf')) return '📄 PDF';
+  if (types.has('audio')) return '🎵 Sauti';
   return '📎 Kiambatisho';
 }
 

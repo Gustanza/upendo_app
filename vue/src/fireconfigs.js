@@ -1,6 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBBQf0DbEAOtFZk7paGD6hJymcbw83TH4o",
@@ -15,3 +17,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db   = getFirestore(app);
 export const auth = getAuth(app);
+export const storage   = getStorage(app);
+// Same default region (us-central1) as the deployed Cloud Functions.
+export const functions = getFunctions(app);

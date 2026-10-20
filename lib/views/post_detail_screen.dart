@@ -4,10 +4,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import '../l10n/l10n.dart';
 import '../models/post_model.dart';
 import '../models/comment_model.dart';
 import '../models/poll_model.dart';
 import '../services/unread_badge_service.dart';
+import '../utils/display_name.dart';
 import '../services/user_preferences.dart';
 import '../services/post_interaction_service.dart';
 import '../widgets/poll_view.dart';
@@ -56,7 +58,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isSaved ? 'Imehifadhiwa!' : 'Imeondolewa!'),
+          content: Text(
+              _isSaved ? context.l10n.savedToast : context.l10n.removedToast),
           duration: const Duration(seconds: 1),
         ),
       );
@@ -254,9 +257,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Wimbo',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    Text(
+                      context.l10n.audioTrack,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                     Text(
                       widget.post.title,
@@ -356,7 +359,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       builder: (context, snapshot) {
                         final count = snapshot.data ?? widget.post.commentCount;
                         return Text(
-                          count > 0 ? 'Comments ($count)' : 'Comments',
+                          count > 0
+                              ? context.l10n.commentsWithCount(count)
+                              : context.l10n.comments,
                           style: const TextStyle(color: Colors.grey),
                         );
                       },
@@ -495,11 +500,11 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text(
-                'Comments',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                context.l10n.comments,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
             Expanded(
@@ -518,9 +523,9 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                           Icon(Icons.chat_bubble_outline,
                               size: 56, color: Colors.grey[300]),
                           const SizedBox(height: 12),
-                          const Text(
-                            'No comments yet.',
-                            style: TextStyle(color: Colors.grey),
+                          Text(
+                            context.l10n.noCommentsYet,
+                            style: const TextStyle(color: Colors.grey),
                           ),
                         ],
                       ),
@@ -538,14 +543,12 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                         leading: CircleAvatar(
                           backgroundColor: const Color(0xFFE8EAF6),
                           child: Text(
-                            comment.userName.isNotEmpty
-                                ? comment.userName[0].toUpperCase()
-                                : '?',
+                            nameInitial(displayName(comment.userName, context.l10n)),
                             style: const TextStyle(color: Color(0xFF0077C2)),
                           ),
                         ),
                         title: Text(
-                          comment.userName,
+                          displayName(comment.userName, context.l10n),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(comment.text),
@@ -571,7 +574,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                     child: TextField(
                       controller: _controller,
                       decoration: InputDecoration(
-                        hintText: 'Andika maoni...',
+                        hintText: context.l10n.writeCommentHint,
                         filled: true,
                         fillColor: Colors.grey.shade100,
                         border: OutlineInputBorder(

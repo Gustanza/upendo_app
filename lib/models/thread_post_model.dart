@@ -14,9 +14,12 @@ class ThreadPostModel {
   final String type;
   final String? pollType;
   final List<String>? pollOptions;
-  // Images (up to 5) and/or a video. imageUrl above mirrors the first image
-  // so builds from before attachments existed still show something.
+  // Images (up to 5), a video, and — in subcategory/group feeds — PDFs and
+  // audio. imageUrl above mirrors the first image so builds from before
+  // attachments existed still show something.
   final List<Attachment> attachments;
+  // External links (user-group posts only), shown as preview cards.
+  final List<String> links;
 
   ThreadPostModel({
     required this.id,
@@ -31,6 +34,7 @@ class ThreadPostModel {
     this.pollType,
     this.pollOptions,
     this.attachments = const [],
+    this.links = const [],
   });
 
   factory ThreadPostModel.fromFirestore(DocumentSnapshot doc) {
@@ -38,7 +42,7 @@ class ThreadPostModel {
     return ThreadPostModel(
       id: doc.id,
       authorId: data['authorId'] ?? '',
-      authorName: data['authorName'] ?? 'Mtumiaji',
+      authorName: data['authorName'] ?? '',
       text: data['text'] ?? '',
       imageUrl: data['imageUrl'] as String?,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
@@ -50,6 +54,9 @@ class ThreadPostModel {
           ? (data['pollOptions'] as List).map((e) => e.toString()).toList()
           : null,
       attachments: Attachment.listFrom(data['attachments']),
+      links: data['links'] is List
+          ? (data['links'] as List).whereType<String>().toList()
+          : const [],
     );
   }
 }

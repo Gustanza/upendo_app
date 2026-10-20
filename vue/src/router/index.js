@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { signOut } from 'firebase/auth'
 import { auth } from '../fireconfigs.js'
+import { isAdmin } from '../utils/adminAccess.js'
 import DashboardLayout    from '../layouts/DashboardLayout.vue'
 import DashboardHome      from '../views/DashboardHome.vue'
 import PostsView          from '../views/PostsView.vue'
@@ -7,6 +9,9 @@ import CategoriesView     from '../views/CategoriesView.vue'
 import UsersView          from '../views/UsersView.vue'
 import PackagesView       from '../views/PackagesView.vue'
 import NotificationsView  from '../views/NotificationsView.vue'
+import CategoryGroupsView from '../views/CategoryGroupsView.vue'
+import UserGroupsView     from '../views/UserGroupsView.vue'
+import WithdrawalsView    from '../views/WithdrawalsView.vue'
 import LoginView          from '../views/LoginView.vue'
 
 const routes = [
@@ -25,6 +30,9 @@ const routes = [
       { path: 'users',      component: UsersView },
       { path: 'packages',       component: PackagesView },
       { path: 'notifications',  component: NotificationsView },
+      { path: 'category-groups', component: CategoryGroupsView },
+      { path: 'user-groups',     component: UserGroupsView },
+      { path: 'withdrawals',     component: WithdrawalsView },
     ],
   },
 ]
@@ -43,6 +51,16 @@ auth.onAuthStateChanged((user) => {
   authReady = true
 })
 
+// Signed-in non-admins (e.g. regular app users) are signed out and bounced
+const guard = (user) => {
+  if (!user) return '/login'
+  if (!isAdmin(user)) {
+    signOut(auth)
+    return '/login'
+  }
+  return true
+}
+
 router.beforeEach((to) => {
   if (to.meta.public) return true
 
@@ -52,12 +70,12 @@ router.beforeEach((to) => {
         unsub()
         authUser  = user
         authReady = true
-        resolve(user ? true : '/login')
+        resolve(guard(user))
       })
     })
   }
 
-  return authUser ? true : '/login'
+  return guard(authUser)
 })
 
 export default router

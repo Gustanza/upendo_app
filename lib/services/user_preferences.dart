@@ -70,4 +70,19 @@ class UserPreferences {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     return List<String>.from(prefs.getStringList(_savedPostsKey) ?? []);
   }
+
+  // --- UI language (see LocaleController) ---
+  // Deliberately not removed by clearUserData(): the language is a device
+  // preference, so it should survive signing out.
+  static const String _languageKey = 'ui_language';
+
+  Future<String?> getLanguageCode() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_languageKey);
+  }
+
+  Future<void> setLanguageCode(String code) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_languageKey, code);
+  }
 }

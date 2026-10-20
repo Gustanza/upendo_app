@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 import '../models/post_model.dart';
 import '../services/post_service.dart';
 import '../widgets/post_stats_row.dart';
@@ -8,7 +9,7 @@ class PostSearchDelegate extends SearchDelegate<PostModel?> {
   final PostService _postService = PostService();
 
   @override
-  String get searchFieldLabel => 'Tafuta mada...';
+  String get searchFieldLabel => currentL10n.searchTopicsHint;
 
   @override
   List<Widget>? buildActions(BuildContext context) {
@@ -34,17 +35,17 @@ class PostSearchDelegate extends SearchDelegate<PostModel?> {
 
   @override
   Widget buildResults(BuildContext context) {
-    return _buildPostList(query);
+    return _buildPostList(context, query);
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    return _buildPostList(query);
+    return _buildPostList(context, query);
   }
 
-  Widget _buildPostList(String query) {
+  Widget _buildPostList(BuildContext context, String query) {
     if (query.isEmpty) {
-      return const Center(child: Text('Andika jina la mada kutafuta'));
+      return Center(child: Text(context.l10n.searchTopicPrompt));
     }
 
     return FutureBuilder<List<PostModel>>(
@@ -55,13 +56,14 @@ class PostSearchDelegate extends SearchDelegate<PostModel?> {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('Hitilafu: ${snapshot.error}'));
+          return Center(
+              child: Text(context.l10n.errorWithDetails('${snapshot.error}')));
         }
 
         final posts = snapshot.data ?? [];
 
         if (posts.isEmpty) {
-          return const Center(child: Text('Mada haijapatikana'));
+          return Center(child: Text(context.l10n.topicNotFound));
         }
 
         return ListView.builder(

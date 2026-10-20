@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/l10n.dart';
 import '../models/notification_model.dart';
 import '../models/post_model.dart';
 import '../models/thread_post_model.dart';
@@ -44,7 +46,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (!mounted) return;
     if (post == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chapisho hili halipatikani tena.')),
+        SnackBar(content: Text(context.l10n.postNoLongerAvailable)),
       );
       return;
     }
@@ -101,11 +103,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   String _formatDate(DateTime? dt) {
     if (dt == null) return '';
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final h = dt.hour.toString().padLeft(2, '0');
-    final m = dt.minute.toString().padLeft(2, '0');
-    return '${months[dt.month - 1]} ${dt.day} · $h:$m';
+    final locale = Localizations.localeOf(context).toString();
+    return '${DateFormat.MMMd(locale).format(dt)} · ${DateFormat.Hm(locale).format(dt)}';
   }
 
   @override
@@ -113,7 +112,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text(context.l10n.notificationsTitle),
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1A1D2E),
         elevation: 0,
@@ -133,15 +132,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           final notifications = snapshot.data ?? [];
 
           if (notifications.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.notifications_off_outlined,
+                  const Icon(Icons.notifications_off_outlined,
                       size: 56, color: Color(0xFFD1D5DB)),
-                  SizedBox(height: 14),
-                  Text('No notifications yet.',
-                      style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 15)),
+                  const SizedBox(height: 14),
+                  Text(context.l10n.noNotificationsYet,
+                      style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 15)),
                 ],
               ),
             );

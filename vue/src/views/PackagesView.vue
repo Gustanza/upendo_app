@@ -349,10 +349,10 @@ async function doDelete() {
 .page-header { display: flex; align-items: center; justify-content: space-between; }
 .subtitle { margin: 0; font-size: 13px; color: #6b7280; }
 .btn-primary {
-  padding: 10px 20px; background: #3b4cca; color: #fff; border: none;
+  padding: 10px 20px; background: #8b2942; color: #fff; border: none;
   border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s;
 }
-.btn-primary:hover { background: #2f3da0; }
+.btn-primary:hover { background: #6e1f33; }
 
 /* ── Empty ── */
 .empty-state {
@@ -381,7 +381,7 @@ async function doDelete() {
 
 .duration-badge {
   display: inline-block; padding: 3px 10px; border-radius: 6px;
-  background: #eef0fd; color: #3b4cca; font-size: 12px; font-weight: 600;
+  background: #f8eaed; color: #8b2942; font-size: 12px; font-weight: 600;
 }
 
 .status-badge {
@@ -401,7 +401,7 @@ async function doDelete() {
   color: #6b7280; transition: all .12s;
 }
 .btn-action svg { width: 14px; height: 14px; }
-.btn-action:hover { border-color: #3b4cca; color: #3b4cca; background: #eef0fd; }
+.btn-action:hover { border-color: #8b2942; color: #8b2942; background: #f8eaed; }
 .btn-action.danger:hover { border-color: #fca5a5; color: #dc2626; background: #fee2e2; }
 
 /* ── Pagination ── */
@@ -415,7 +415,7 @@ async function doDelete() {
   padding: 6px 14px; border: 1.5px solid #e5e7eb; border-radius: 7px;
   background: #fff; font-size: 13px; font-weight: 500; color: #374151; cursor: pointer; transition: all .12s;
 }
-.page-btn:hover:not(:disabled) { border-color: #3b4cca; color: #3b4cca; }
+.page-btn:hover:not(:disabled) { border-color: #8b2942; color: #8b2942; }
 .page-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ── Modal overlay ── */
@@ -454,7 +454,7 @@ async function doDelete() {
   font-size: 14px; color: #1a1d2e; background: #fff; outline: none; transition: border-color .15s;
   font-family: inherit;
 }
-.field-input:focus { border-color: #3b4cca; }
+.field-input:focus { border-color: #8b2942; }
 .field-input.textarea { resize: vertical; min-height: 60px; }
 select.field-input { cursor: pointer; }
 
@@ -472,7 +472,7 @@ select.field-input { cursor: pointer; }
   width: 44px; height: 24px; border-radius: 12px;
   background: #d1d5db; transition: background .2s; position: relative;
 }
-.toggle-input:checked ~ .toggle-track { background: #3b4cca; }
+.toggle-input:checked ~ .toggle-track { background: #8b2942; }
 .toggle-thumb {
   position: absolute; top: 4px; left: 4px; width: 16px; height: 16px;
   border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .2s;
@@ -491,10 +491,10 @@ select.field-input { cursor: pointer; }
 }
 .btn-cancel:hover { background: #f3f4f6; }
 .btn-save {
-  padding: 9px 22px; border: none; border-radius: 8px; background: #3b4cca;
+  padding: 9px 22px; border: none; border-radius: 8px; background: #8b2942;
   color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s;
 }
-.btn-save:hover:not(:disabled) { background: #2f3da0; }
+.btn-save:hover:not(:disabled) { background: #6e1f33; }
 .btn-save:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ── Delete confirm ── */

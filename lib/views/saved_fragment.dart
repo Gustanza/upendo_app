@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 import '../models/post_model.dart';
 import '../services/post_service.dart';
 import '../services/user_preferences.dart';
@@ -81,19 +82,19 @@ class SavedFragmentState extends State<SavedFragment> {
       padding: const EdgeInsets.only(top: 60, left: 20, right: 20, bottom: 30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           Text(
-            'Alamisho',
-            style: TextStyle(
+            context.l10n.savedTitle,
+            style: const TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 5),
+          const SizedBox(height: 5),
           Text(
-            'Mada ulizohifadhi kwa ajili ya baadaye',
-            style: TextStyle(fontSize: 14, color: Colors.white70),
+            context.l10n.savedSubtitle,
+            style: const TextStyle(fontSize: 14, color: Colors.white70),
           ),
         ],
       ),
@@ -112,9 +113,9 @@ class SavedFragmentState extends State<SavedFragment> {
           children: [
             Icon(Icons.bookmark_border, size: 80, color: Colors.grey.shade300),
             const SizedBox(height: 20),
-            const Text(
-              'Hujachagua mada bado.',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
+            Text(
+              context.l10n.savedEmpty,
+              style: const TextStyle(color: Colors.grey, fontSize: 16),
             ),
           ],
         ),
@@ -149,7 +150,7 @@ class SavedFragmentState extends State<SavedFragment> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),

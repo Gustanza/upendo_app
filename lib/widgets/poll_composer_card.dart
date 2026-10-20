@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 import '../models/poll_model.dart';
 
 const int _maxOptions = 15;
@@ -154,7 +155,7 @@ class _PollComposerCardState extends State<PollComposerCard> {
             // at 500 chars server-side — enforce it here too so the error
             // surfaces before submit instead of as a raw permission-denied.
             maxLength: 500,
-            decoration: _fieldDecoration('Andika swali lako...'),
+            decoration: _fieldDecoration(context.l10n.pollQuestionHint),
             onChanged: (value) {
               widget.draft.question = value;
               widget.onChanged();
@@ -172,9 +173,14 @@ class _PollComposerCardState extends State<PollComposerCard> {
   Widget _buildTypeToggle() {
     return Row(
       children: [
-        Expanded(child: _buildTypeButton('Chaguo Nyingi', PollType.multipleChoice)),
+        Expanded(
+          child: _buildTypeButton(
+              context.l10n.pollMultipleChoice, PollType.multipleChoice),
+        ),
         const SizedBox(width: 8),
-        Expanded(child: _buildTypeButton('Jibu la Maandishi', PollType.openText)),
+        Expanded(
+          child: _buildTypeButton(context.l10n.pollOpenText, PollType.openText),
+        ),
       ],
     );
   }
@@ -218,7 +224,7 @@ class _PollComposerCardState extends State<PollComposerCard> {
                 Expanded(
                   child: TextField(
                     controller: _optionControllers[i],
-                    decoration: _fieldDecoration('Chaguo ${i + 1}'),
+                    decoration: _fieldDecoration(context.l10n.pollOptionN(i + 1)),
                     onChanged: (value) {
                       widget.draft.options[i] = value;
                       widget.onChanged();
@@ -237,7 +243,8 @@ class _PollComposerCardState extends State<PollComposerCard> {
           TextButton.icon(
             onPressed: _addOption,
             icon: const Icon(Icons.add, color: Color(0xFF0077C2)),
-            label: const Text('Ongeza chaguo', style: TextStyle(color: Color(0xFF0077C2))),
+            label: Text(context.l10n.pollAddOption,
+                style: const TextStyle(color: Color(0xFF0077C2))),
           ),
       ],
     );

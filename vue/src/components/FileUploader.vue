@@ -176,12 +176,12 @@ async function upload(file) {
   transition: all 0.15s;
   text-align: center;
 }
-.uploader.dragging .dropzone { border-color: #3b4cca; background: #eef0fd; }
-.dropzone:hover { border-color: #3b4cca; background: #eef0fd; }
+.uploader.dragging .dropzone { border-color: #8b2942; background: #f8eaed; }
+.dropzone:hover { border-color: #8b2942; background: #f8eaed; }
 
 .dz-icon svg { width: 28px; height: 28px; color: #9ca3af; }
 .dz-main { margin: 0; font-size: 13px; font-weight: 500; color: #4b5563; }
-.dz-link { color: #3b4cca; font-weight: 600; }
+.dz-link { color: #8b2942; font-weight: 600; }
 .dz-hint { margin: 0; font-size: 11px; color: #9ca3af; }
 .dz-error { margin: 4px 0 0; font-size: 12px; color: #c81e1e; }
 
@@ -205,14 +205,14 @@ async function upload(file) {
 .current-icon {
   width: 40px;
   height: 40px;
-  background: #eef0fd;
+  background: #f8eaed;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.current-icon svg { width: 20px; height: 20px; color: #3b4cca; }
+.current-icon svg { width: 20px; height: 20px; color: #8b2942; }
 .current-info { flex: 1; min-width: 0; }
 .current-label { margin: 0; font-size: 12px; font-weight: 600; color: #374151; }
 .current-url { margin: 2px 0 0; font-size: 11px; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -229,10 +229,10 @@ async function upload(file) {
 }
 .up-info { display: flex; justify-content: space-between; align-items: center; }
 .up-name { font-size: 12px; font-weight: 600; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%; }
-.up-pct { font-size: 12px; font-weight: 700; color: #3b4cca; flex-shrink: 0; }
+.up-pct { font-size: 12px; font-weight: 700; color: #8b2942; flex-shrink: 0; }
 
 .progress-track { height: 5px; background: #dde0ee; border-radius: 99px; overflow: hidden; }
-.progress-bar { height: 100%; background: #3b4cca; border-radius: 99px; transition: width 0.2s; }
+.progress-bar { height: 100%; background: #8b2942; border-radius: 99px; transition: width 0.2s; }
 
 /* Done */
 .upload-done {
@@ -269,7 +269,7 @@ async function upload(file) {
   cursor: pointer;
   transition: all 0.15s;
 }
-.replace-btn:hover { border-color: #3b4cca; color: #3b4cca; }
+.replace-btn:hover { border-color: #8b2942; color: #8b2942; }
 
 .hidden-input { display: none; }
 </style>

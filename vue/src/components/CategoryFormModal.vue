@@ -57,6 +57,18 @@
           </p>
         </div>
 
+        <!-- Category group (main categories only) -->
+        <div v-if="!form.parentId" class="field">
+          <label>Category group</label>
+          <select v-model="form.groupId" class="text-input">
+            <option :value="null">None (shown directly on Explore)</option>
+            <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+          </select>
+          <p class="field-hint">
+            Groups are the top level in the app: group → main categories → subcategories.
+          </p>
+        </div>
+
         <!-- Color -->
         <div class="field">
           <label>Color</label>
@@ -157,6 +169,8 @@ const props = defineProps({
   // category" options — kept in sync live by CategoriesView.vue's onSnapshot
   // listener, so this always reflects the current nesting state.
   categories: { type: Array, default: () => [] },
+  // categoryGroups docs, for the "Category group" select (main categories).
+  groups:     { type: Array, default: () => [] },
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -169,6 +183,7 @@ const form = reactive({
   colorHex:        props.category?.colorHex  ?? 0xFF1565C0,
   isProtected:     props.category?.isProtected ?? false,
   parentId:        props.category?.parentId  ?? null,
+  groupId:         props.category?.groupId   ?? null,
   password:        '',
   confirmPassword: '',
 })
@@ -255,6 +270,15 @@ async function save() {
       updatedAt: serverTimestamp(),
     }
 
+    // Only main categories belong to a group; a subcategory inherits its
+    // place from its parent, so any stale groupId is removed.
+    const groupId = parentId ? null : (form.groupId || null)
+    if (groupId) {
+      payload.groupId = groupId
+    } else if (isEdit.value) {
+      payload.groupId = deleteField()
+    }
+
     if (form.isProtected && form.password) {
       payload.passwordHash = await sha256(form.password)
     } else if (!form.isProtected && isEdit.value) {
@@ -338,7 +362,7 @@ async function save() {
   width: 100%;
   box-sizing: border-box;
 }
-.text-input:focus { border-color: #3b4cca; }
+.text-input:focus { border-color: #8b2942; }
 .input-error { border-color: #dc2626 !important; }
 
 .field-hint {
@@ -377,7 +401,7 @@ async function save() {
   flex-shrink: 0;
   padding: 0;
 }
-.toggle-track.active { background: #3b4cca; }
+.toggle-track.active { background: #8b2942; }
 
 .toggle-thumb {
   position: absolute;
@@ -459,8 +483,8 @@ async function save() {
   cursor: pointer;
   transition: all .12s;
 }
-.icon-tile:hover { background: #eef0fb; border-color: #3b4cca; }
-.icon-tile.selected { background: #eef0fb; border-color: #3b4cca; border-width: 2px; }
+.icon-tile:hover { background: #f8eaed; border-color: #8b2942; }
+.icon-tile.selected { background: #f8eaed; border-color: #8b2942; border-width: 2px; }
 
 .icon-tile .mi { font-size: 22px; color: #374151; }
 .icon-label { font-size: 9px; color: #6b7280; text-align: center; line-height: 1.2; }
@@ -483,7 +507,7 @@ async function save() {
 .color-swatch:hover { transform: scale(1.12); }
 .color-swatch.selected {
   border-color: #fff;
-  outline-color: #3b4cca;
+  outline-color: #8b2942;
   transform: scale(1.1);
 }
 
@@ -511,14 +535,14 @@ async function save() {
   padding: 9px 22px;
   border: none;
   border-radius: 8px;
-  background: #3b4cca;
+  background: #8b2942;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: background .15s;
 }
-.btn-save:hover:not(:disabled) { background: #2f3da0; }
+.btn-save:hover:not(:disabled) { background: #6e1f33; }
 .btn-save:disabled { opacity: .5; cursor: not-allowed; }
 
 .mi {

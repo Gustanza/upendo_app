@@ -1,9 +1,14 @@
+import '../l10n/l10n.dart';
+
+// No BuildContext here (called from many list tiles), so it reads the
+// currently selected UI language via currentL10n.
 String timeAgo(DateTime? dateTime) {
   if (dateTime == null) return '';
+  final l10n = currentL10n;
   final diff = DateTime.now().difference(dateTime);
-  if (diff.inSeconds < 60) return 'Sasa hivi';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} dak';
-  if (diff.inHours < 24) return '${diff.inHours} saa';
-  if (diff.inDays < 7) return '${diff.inDays} siku';
-  return '${(diff.inDays / 7).floor()} wiki';
+  if (diff.inSeconds < 60) return l10n.timeJustNow;
+  if (diff.inMinutes < 60) return l10n.timeMinutes(diff.inMinutes);
+  if (diff.inHours < 24) return l10n.timeHours(diff.inHours);
+  if (diff.inDays < 7) return l10n.timeDays(diff.inDays);
+  return l10n.timeWeeks((diff.inDays / 7).floor());
 }

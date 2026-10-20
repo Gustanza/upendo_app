@@ -1,16 +1,30 @@
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 import '../services/category_service.dart';
-import '../models/category_model.dart';
 import '../utils/category_navigation.dart';
+import '../utils/category_tree.dart';
 import '../widgets/category_grid_tile.dart';
 
-class ExploreFragment extends StatelessWidget {
+class ExploreFragment extends StatefulWidget {
   const ExploreFragment({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final categoryService = CategoryService();
+  State<ExploreFragment> createState() => _ExploreFragmentState();
+}
 
+class _ExploreFragmentState extends State<ExploreFragment> {
+  // Created once so tab switches/rebuilds don't reattach the listeners.
+  late final Stream<CategoryTree> _tree = CategoryService().watchTree();
+
+  static const _gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: 3,
+    crossAxisSpacing: 15,
+    mainAxisSpacing: 25,
+    childAspectRatio: 0.8,
+  );
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
         // Header
@@ -47,9 +61,9 @@ class ExploreFragment extends StatelessWidget {
                 alignment: Alignment.centerLeft,
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Chagua Mada\nyako pendwa',
-                style: TextStyle(
+              Text(
+                context.l10n.exploreTitle,
+                style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -57,73 +71,98 @@ class ExploreFragment extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Jifunze kwa Video, Sauti, Soma na Muziki',
-                style: TextStyle(fontSize: 14, color: Colors.white70),
+              Text(
+                context.l10n.exploreSubtitle,
+                style: const TextStyle(fontSize: 14, color: Colors.white70),
               ),
             ],
           ),
         ),
 
-        // Grid
+        // Grid: category groups first, then main categories that aren't in
+        // any group (all of them, until an admin creates groups). A
+        // category that's someone else's child never appears here — it
+        // only shows up inside that parent's SubcategoriesScreen.
         Expanded(
-          child: StreamBuilder<List<Category>>(
-            stream: categoryService.getCategories(),
+          child: StreamBuilder<CategoryTree>(
+            stream: _tree,
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(context.l10n.errorWithDetails('${snapshot.error}')),
+                );
+              }
+              if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
+              final tree = snapshot.data!;
+              if (!tree.hasGroups && tree.ungroupedMains.isEmpty) {
+                return Center(child: Text(context.l10n.noCategoriesNow));
               }
 
-              final categories = snapshot.data ?? [];
-
-              // The main grid only ever shows top-level categories — a
-              // category that's someone else's child never appears here,
-              // it only shows up inside that parent's SubcategoriesScreen.
-              final topLevel =
-                  categories.where((c) => c.parentId == null).toList();
-
-              if (topLevel.isEmpty) {
-                return const Center(child: Text('No categories found.'));
-              }
-
-              // Only used to decide, at tap time, which screen to push —
-              // SubcategoriesScreen subscribes to the live stream itself
-              // rather than being handed this snapshot's children, so it
-              // stays current after navigation (see subcategories_screen.dart).
-              final parentIdsWithChildren = categories
-                  .map((c) => c.parentId)
-                  .whereType<String>()
-                  .toSet();
-
-              return GridView.builder(
-                padding: const EdgeInsets.all(20),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 15,
-                  mainAxisSpacing: 25,
-                  childAspectRatio: 0.8,
-                ),
-                itemCount: topLevel.length,
-                itemBuilder: (context, index) {
-                  final category = topLevel[index];
-                  return CategoryGridTile(
-                    category: category,
-                    onTap: () => openCategory(
-                      context,
-                      category,
-                      hasChildren: parentIdsWithChildren.contains(category.id),
+              return CustomScrollView(
+                slivers: [
+                  if (tree.hasGroups) ...[
+                    _sectionHeader(context.l10n.categoryGroupsTitle),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                      sliver: SliverGrid.builder(
+                        gridDelegate: _gridDelegate,
+                        itemCount: tree.groups.length,
+                        itemBuilder: (context, index) {
+                          final group = tree.groups[index];
+                          return CategoryGroupTile(
+                            group: group,
+                            mainCount: tree.mainsIn(group.id).length,
+                            onTap: () => openCategoryGroup(context, group),
+                          );
+                        },
+                      ),
                     ),
-                  );
-                },
+                    if (tree.ungroupedMains.isNotEmpty)
+                      _sectionHeader(context.l10n.otherCategoriesTitle),
+                  ],
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(20, tree.hasGroups ? 0 : 20, 20, 110),
+                    sliver: SliverGrid.builder(
+                      gridDelegate: _gridDelegate,
+                      itemCount: tree.ungroupedMains.length,
+                      itemBuilder: (context, index) {
+                        final category = tree.ungroupedMains[index];
+                        return CategoryGridTile(
+                          category: category,
+                          onTap: () => openCategory(
+                            context,
+                            category,
+                            hasChildren: tree.hasChildren(category),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               );
             },
           ),
         ),
       ],
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      sliver: SliverToBoxAdapter(
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1A1D2E),
+          ),
+        ),
+      ),
     );
   }
 }

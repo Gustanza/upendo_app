@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 import '../models/poll_model.dart';
 import '../services/poll_service.dart';
 
@@ -54,7 +55,7 @@ class _PollViewState extends State<PollView> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Imeshindwa kutuma: $e')));
+            .showSnackBar(SnackBar(content: Text(context.l10n.sendFailed('$e'))));
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -71,7 +72,7 @@ class _PollViewState extends State<PollView> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Imeshindwa kufuta: $e')));
+            .showSnackBar(SnackBar(content: Text(context.l10n.deleteFailed('$e'))));
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -112,7 +113,7 @@ class _PollViewState extends State<PollView> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${responses.length} wamejibu',
+                context.l10n.pollResponsesCount(responses.length),
                 style: const TextStyle(fontSize: 12, color: Colors.black54),
               ),
               const SizedBox(height: 12),
@@ -142,7 +143,7 @@ class _PollViewState extends State<PollView> {
           maxLines: 4,
           enabled: !_submitting,
           decoration: InputDecoration(
-            hintText: 'Andika jibu lako...',
+            hintText: context.l10n.pollAnswerHint,
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(
@@ -168,7 +169,7 @@ class _PollViewState extends State<PollView> {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
-                : const Text('Tuma'),
+                : Text(context.l10n.send),
           ),
         ),
       ],
@@ -222,7 +223,8 @@ class _PollViewState extends State<PollView> {
           const SizedBox(height: 2),
           Align(
             alignment: Alignment.centerRight,
-            child: _buildSmallTextButton('Futa jibu', _retract, color: Colors.redAccent),
+            child: _buildSmallTextButton(context.l10n.pollRetract, _retract,
+                color: Colors.redAccent),
           ),
         ],
       );
@@ -240,7 +242,7 @@ class _PollViewState extends State<PollView> {
             maxLines: 4,
             enabled: !_submitting,
             decoration: InputDecoration(
-              hintText: 'Andika jibu lako...',
+              hintText: context.l10n.pollAnswerHint,
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
@@ -254,7 +256,7 @@ class _PollViewState extends State<PollView> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               _buildSmallTextButton(
-                'Ghairi',
+                context.l10n.cancel,
                 _submitting ? null : () => setState(() => _editing = false),
               ),
               const SizedBox(width: 4),
@@ -277,7 +279,7 @@ class _PollViewState extends State<PollView> {
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Text('Hifadhi'),
+                    : Text(context.l10n.save),
               ),
             ],
           ),
@@ -290,13 +292,13 @@ class _PollViewState extends State<PollView> {
       children: [
         Row(
           children: [
-            const Text(
-              'Jibu lako:',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0077C2)),
+            Text(
+              context.l10n.pollYourAnswer,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0077C2)),
             ),
             const Spacer(),
             _buildSmallTextButton(
-              'Badilisha',
+              context.l10n.edit,
               _submitting
                   ? null
                   : () {
@@ -304,7 +306,8 @@ class _PollViewState extends State<PollView> {
                       setState(() => _editing = true);
                     },
             ),
-            _buildSmallTextButton('Futa', _retract, color: Colors.redAccent),
+            _buildSmallTextButton(context.l10n.delete, _retract,
+                color: Colors.redAccent),
           ],
         ),
         Text(mine.answer, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),

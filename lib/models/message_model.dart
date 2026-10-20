@@ -4,6 +4,9 @@ import 'attachment_model.dart';
 class MessageModel {
   final String id;
   final String senderId;
+  // Only written for group/room chats (see ChatChannel.showSenderNames) —
+  // a 1:1 conversation already knows who the other person is.
+  final String? senderName;
   final String text;
   final DateTime? createdAt;
   final String type;
@@ -15,6 +18,7 @@ class MessageModel {
     required this.id,
     required this.senderId,
     required this.text,
+    this.senderName,
     this.createdAt,
     this.type = 'text',
     this.pollType,
@@ -26,6 +30,7 @@ class MessageModel {
     return MessageModel(
       id: id,
       senderId: data['senderId'] ?? '',
+      senderName: data['senderName'] as String?,
       text: data['text'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       type: data['type'] ?? 'text',

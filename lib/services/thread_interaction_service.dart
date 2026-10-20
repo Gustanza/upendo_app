@@ -5,11 +5,20 @@ import '../models/thread_reply_model.dart';
 class ThreadInteractionService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  /// Collection holding the posts (see ThreadScope.postsPath) — the
+  /// community wall by default.
+  final String postsPath;
+
+  ThreadInteractionService({this.postsPath = 'threadPosts'});
+
+  DocumentReference<Map<String, dynamic>> _post(String postId) =>
+      _db.collection(postsPath).doc(postId);
+
   CollectionReference<Map<String, dynamic>> _replies(String postId) =>
-      _db.collection('threadPosts').doc(postId).collection('replies');
+      _post(postId).collection('replies');
 
   DocumentReference<Map<String, dynamic>> _like(String postId, String uid) =>
-      _db.collection('threadPosts').doc(postId).collection('likes').doc(uid);
+      _post(postId).collection('likes').doc(uid);
 
   // Unpaginated: a single thread's reply list, not a global feed — same
   // tradeoff as PostInteractionService.getComments.
@@ -27,7 +36,7 @@ class ThreadInteractionService {
     if (trimmed.isEmpty) return;
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final userDoc = await _db.collection('users').doc(uid).get();
-    final authorName = (userDoc.data()?['fullName'] as String?) ?? 'Mtumiaji';
+    final authorName = (userDoc.data()?['fullName'] as String?) ?? '';
     await _replies(postId).add({
       'authorId': uid,
       'authorName': authorName,
@@ -37,7 +46,7 @@ class ThreadInteractionService {
   }
 
   Future<void> deleteReply(String postId, String replyId) {
-    // Ownership is enforced by firestore.rules, not here.
+    // Ownership (or group-owner moderation) is enforced by firestore.rules.
     return _replies(postId).doc(replyId).delete();
   }
 
@@ -62,9 +71,7 @@ class ThreadInteractionService {
   Stream<int> commentCount(String postId) => _postCount(postId, 'commentCount');
 
   Stream<int> _postCount(String postId, String field) {
-    return _db
-        .collection('threadPosts')
-        .doc(postId)
+    return _post(postId)
         .snapshots()
         .map((d) => (d.data()?[field] ?? 0) as int);
   }

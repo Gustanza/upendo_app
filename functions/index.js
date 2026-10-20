@@ -28,6 +28,10 @@ const {
   notifyThreadLike,
 }                                         = require('./interactions/activityNotifications');
 const { notifyConversationMessage }      = require('./interactions/messageNotifications');
+const scopedFeeds                        = require('./interactions/scopedFeeds');
+const { generateReferralCode, applyReferralCode } = require('./referrals/index');
+const { requestWithdrawal, adminResolveWithdrawal } = require('./wallet/withdrawals');
+const { creditReferralOnCompletion } = require('./wallet/commission');
 
 exports.subscribe                      = subscribe;
 exports.resolvePayment                 = resolvePayment;
@@ -46,6 +50,25 @@ exports.notifyThreadPostCreated        = notifyThreadPostCreated;
 exports.notifyThreadReply              = notifyThreadReply;
 exports.notifyThreadLike               = notifyThreadLike;
 exports.notifyConversationMessage      = notifyConversationMessage;
+
+// Subcategory feeds/chat rooms and user groups (counters + cleanup).
+exports.updateSubcategoryReplyCount    = scopedFeeds.updateSubcategoryReplyCount;
+exports.updateSubcategoryLikeCount     = scopedFeeds.updateSubcategoryLikeCount;
+exports.updateGroupReplyCount          = scopedFeeds.updateGroupReplyCount;
+exports.updateGroupLikeCount           = scopedFeeds.updateGroupLikeCount;
+exports.updateGroupMemberCount         = scopedFeeds.updateGroupMemberCount;
+exports.cleanupSubcategoryPost         = scopedFeeds.cleanupSubcategoryPost;
+exports.cleanupGroupPost               = scopedFeeds.cleanupGroupPost;
+exports.cleanupSubcategoryMessage      = scopedFeeds.cleanupSubcategoryMessage;
+exports.cleanupGroupMessage            = scopedFeeds.cleanupGroupMessage;
+exports.cleanupUserGroup               = scopedFeeds.cleanupUserGroup;
+
+// Referral codes + wallet (balances are written only by these functions).
+exports.generateReferralCode           = generateReferralCode;
+exports.applyReferralCode              = applyReferralCode;
+exports.requestWithdrawal              = requestWithdrawal;
+exports.adminResolveWithdrawal         = adminResolveWithdrawal;
+exports.creditReferralOnCompletion     = creditReferralOnCompletion;
 
 exports.registerFcmToken = onCall(async (request) => {
   const token = request.data.token;

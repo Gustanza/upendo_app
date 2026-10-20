@@ -7,10 +7,13 @@ class ThreadStatsRow extends StatefulWidget {
   final int commentCount;
   final Color iconColor;
   final double fontSize;
+  // Collection of the post (ThreadScope.postsPath) — the wall by default.
+  final String postsPath;
 
   const ThreadStatsRow({
     super.key,
     required this.postId,
+    this.postsPath = 'threadPosts',
     required this.likeCount,
     required this.commentCount,
     this.iconColor = Colors.grey,
@@ -22,7 +25,8 @@ class ThreadStatsRow extends StatefulWidget {
 }
 
 class _ThreadStatsRowState extends State<ThreadStatsRow> {
-  final ThreadInteractionService _interactionService = ThreadInteractionService();
+  late final ThreadInteractionService _interactionService =
+      ThreadInteractionService(postsPath: widget.postsPath);
   late final Stream<bool> _likedByMe =
       _interactionService.likedByMe(widget.postId);
 
