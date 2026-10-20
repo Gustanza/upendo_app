@@ -6,7 +6,10 @@ const { onDocumentWritten }        = require('firebase-functions/v2/firestore');
 const { onCall, HttpsError }       = require('firebase-functions/v2/https');
 
 initializeApp();
-setGlobalOptions({ maxInstances: 10 });
+// cpu "gcf_gen1" = the small fractional CPU of 1st-gen functions. With the
+// default full CPU, ~34 functions x 10 instances exceeds the per-region
+// Cloud Run CPU quota and deploys fail with "Quota exceeded".
+setGlobalOptions({ maxInstances: 10, cpu: "gcf_gen1" });
 
 const { subscribe }                      = require('./payments/index');
 const { resolvePayment }                 = require('./payments/ipnresolver');
