@@ -2,11 +2,13 @@ const axios = require('axios');
 const crypto = require('crypto');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { onRequest } = require('firebase-functions/v2/https');
+const { defineSecret } = require('firebase-functions/params');
 const { creditReferralCommissionSafely } = require('../wallet/commission');
 const { parseAmount } = require('../wallet/money');
 
 const CLIENT_ID     = "IDv3AhwoKTFpKlptDHujeksgg0xu5k2b";
-const API_KEY       = "SKcroiysOoPhMKfR43LxTh8gvCzXTBsK2a5H63Tfxt";
+// Set with: firebase functions:secrets:set CLICKPESA_API_KEY
+const API_KEY       = defineSecret("CLICKPESA_API_KEY");
 const CHECKSUM_KEY  = "CHKtTSu5oRqvWfrkKItGkyj23MElziHKdFk";
 
 const axiosClient = axios.create({
@@ -70,7 +72,7 @@ async function getAuthToken() {
         // empty object (not null/undefined — those serialize to the literal
         // text "null", which its parser rejects) is required here.
         resp = await axiosClient.post('/generate-token', {}, {
-            headers: { "client-id": CLIENT_ID, "api-key": API_KEY },
+            headers: { "client-id": CLIENT_ID, "api-key": API_KEY.value() },
         });
     } catch (error) {
         logClickPesaError('generate-token', error);
@@ -85,7 +87,7 @@ async function getAuthToken() {
 }
 
 const subscribeClickPesa = onRequest(
-    { cors: true },
+    { cors: true, secrets: [API_KEY] },
     async (req, res) => {
         try {
             const db = getFirestore();
@@ -215,7 +217,7 @@ async function fetchClickPesaPayment(orderReference) {
 // ClickPesa webhook target — registered manually in their merchant dashboard
 // under Settings → Developers → Add Webhooks for PAYMENT RECEIVED / PAYMENT FAILED.
 const resolvePaymentClickPesa = onRequest(
-    { cors: true },
+    { cors: true, secrets: [API_KEY] },
     async (req, res) => {
         const db = getFirestore();
         const { data } = req.body || {};
