@@ -7,7 +7,19 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    // ── Cross-service lookups (firestore.get / firestore.exists) ─────────
+    // In production these only work once the Storage service agent has been
+    // granted the "Firebase Rules Firestore Service Agent" role
+    // (roles/firebaserules.firestoreServiceAgent). The emulator never
+    // enforces that, so tests pass while production denies the request.
+    // Every path the app WRITES to is therefore authorised from the path
+    // and request.auth alone; lookups are only used as an optional extra
+    // way to READ (admins, other group members via the SDK) and by the
+    // legacy paths of older app builds. Files are normally read through
+    // their download URL (token), which doesn't evaluate these rules.
+
     // Same admin check as firestore.rules / functions/admin/isAdmin.js.
+    // Needs the cross-service grant above.
     function isAdmin() {
       return signedIn()
         && request.auth.token.get('email_verified', false) == true
@@ -42,15 +54,22 @@ service firebase.storage {
       allow delete: if false;
     }
 
-    // Private chat attachments — images, video, audio and PDFs of any size —
-    // only readable/writable by the two conversation participants. Uses a
-    // cross-service Firestore lookup, which Firebase asks to authorise on
-    // the first deploy of these rules.
+    // A conversation id IS its two participants' uids, sorted and joined
+    // with '_' — firestore.rules refuses any other id on create — so
+    // membership is read straight from the path (no Firestore lookup).
+    function isConversationParticipant(conversationId) {
+      return signedIn()
+        && conversationId.split('_').size() == 2
+        && request.auth.uid in conversationId.split('_');
+    }
+
+    // Private 1:1 chat attachments (MediaLimits.directMessage in the app):
+    // images, a video (≤ 5 min, checked in the app), PDFs and audio ≤ 50 MB
+    // — only the two participants upload or read them.
     match /conversations/{conversationId}/{messageId}/{fileName} {
-      allow read, write: if request.auth != null
-        && request.auth.uid in firestore.get(
-             /databases/(default)/documents/conversations/$(conversationId)).data.participants;
-      allow delete: if false;
+      allow read: if isConversationParticipant(conversationId);
+      allow create: if isConversationParticipant(conversationId) && communityFile();
+      allow update, delete: if false;
     }
 
     // subcategoryFeeds/{categoryId}/posts/{postId}/… and …/messages/{id}/…
@@ -64,7 +83,40 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
-    // A user group's profile picture — only its owner uploads it.
+    // A user group's profile picture: userGroups/{g}/photo/{uploaderUid}/…
+    // Anyone may upload into THEIR OWN folder (the app does it before the
+    // group doc exists, so a Firestore owner check couldn't work anyway);
+    // only the owner can make it the group's picture — firestore.rules
+    // requires photoPath to be under userGroups/{g}/photo/{ownerUid}/.
+    match /userGroups/{groupId}/photo/{uid}/{fileName} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.size < 5 * 1024 * 1024;
+      allow update, delete: if false;
+    }
+
+    // Group post/chat attachments: userGroups/{g}/{posts|messages}/{itemId}/
+    // {uploaderUid}/{file}. Writable by the uploader into their own folder
+    // only; firestore.rules only lets a MEMBER create the post/message that
+    // references them, and requires every attachment path to sit in that
+    // author's folder for that doc. Read: the uploader, plus (if the
+    // cross-service grant exists) members and admins.
+    match /userGroups/{groupId}/{kind}/{itemId}/{uid}/{fileName} {
+      allow read: if signedIn()
+        && (request.auth.uid == uid
+            || firestore.exists(/databases/(default)/documents/userGroups/$(groupId)/members/$(request.auth.uid))
+            || isAdmin());
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && (kind == 'posts' || kind == 'messages')
+        && communityFile();
+      allow update, delete: if false;
+    }
+
+    // LEGACY (app builds before uploader-scoped paths): owner check via a
+    // cross-service lookup — works only with the IAM grant described above.
     match /userGroups/{groupId}/photo/{fileName} {
       allow read: if signedIn();
       allow create: if signedIn()
@@ -74,7 +126,8 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
-    // Group post/chat attachments — members only (admins can view).
+    // LEGACY group post/chat attachments (older app builds) — members only
+    // via a cross-service lookup; needs the IAM grant described above.
     match /userGroups/{groupId}/{kind}/{itemId}/{fileName} {
       allow read: if signedIn()
         && (firestore.exists(/databases/(default)/documents/userGroups/$(groupId)/members/$(request.auth.uid))
@@ -87,7 +140,8 @@ service firebase.storage {
     }
 
     // ID photos attached to wallet withdrawal requests — private to the
-    // user and the admins reviewing the request.
+    // user and the admins reviewing the request. The admin branch (the
+    // dashboard's getDownloadURL) needs the cross-service grant above.
     match /withdrawals/{uid}/{fileName} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
       allow create: if signedIn()

@@ -58,7 +58,10 @@
 
           <!-- Category -->
           <div class="field">
-            <label class="label">Category</label>
+            <label class="label">
+              Category
+              <span class="label-hint">Pick the subcategory whose Topics tab should show this post</span>
+            </label>
             <div v-if="categoriesLoading" class="cat-loading">Loading categories…</div>
             <div v-else class="cat-dropdown" v-click-outside="() => catOpen = false">
               <button type="button" class="cat-trigger" @click="toggleCatMenu">
@@ -66,7 +69,7 @@
                   <span class="cat-trigger-icon" :style="{ background: catCssColor(selectedCategory.colorHex) }">
                     <span class="mi">{{ catIconChar(selectedCategory.iconCode) }}</span>
                   </span>
-                  <span class="cat-trigger-name">{{ selectedCategory.name }}</span>
+                  <span class="cat-trigger-name">{{ selectedCategory.label }}</span>
                 </template>
                 <template v-else>
                   <span class="cat-trigger-placeholder">Select a category…</span>
@@ -86,7 +89,7 @@
                     v-model="catSearch"
                     type="text"
                     class="cat-search-input"
-                    placeholder="Search categories…"
+                    placeholder="Search main categories or subcategories…"
                     @keydown.esc="catOpen = false"
                   />
                 </div>
@@ -102,12 +105,17 @@
                     type="button"
                     class="cat-option"
                     :class="{ active: form.category_id === cat.id }"
+                    :style="cat.depth ? 'padding-left:34px' : ''"
                     @click="selectCat(cat)"
                   >
                     <span class="cat-option-icon" :style="{ background: catCssColor(cat.colorHex) }">
                       <span class="mi">{{ catIconChar(cat.iconCode) }}</span>
                     </span>
-                    <span class="cat-option-name">{{ cat.name }}</span>
+                    <span class="cat-option-name">
+                      {{ cat.name }}
+                      <small v-if="cat.depth" style="color:#8b8fa8"> · in {{ cat.parentName }}</small>
+                      <small v-else-if="cat.subCount" style="color:#8b8fa8"> · main category, {{ cat.subCount }} subcategories</small>
+                    </span>
                     <svg v-if="form.category_id === cat.id" class="cat-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                       <polyline points="20 6 9 17 4 12"/>
                     </svg>
@@ -118,6 +126,11 @@
                 </div>
               </div>
             </div>
+            <p v-if="selectedCategory && selectedCategory.depth === 0 && selectedCategory.subCount" class="cat-loading" style="margin-top:6px">
+              This is a main category with subcategories: the post will appear in the Topics tab of
+              every one of its {{ selectedCategory.subCount }} subcategories (after their own posts).
+              To show it in just one, pick that subcategory instead.
+            </p>
           </div>
 
           <!-- Thumbnail upload -->
@@ -254,6 +267,8 @@ import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue'
 import { collection, addDoc, doc, updateDoc, getDocs, serverTimestamp } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
 import { flutterColorToCss, iconChar } from '../utils/iconData.js'
+import { categoryOptions, filterCategoryOptions } from '../utils/categoryOptions.js'
+import { describeFirebaseError } from '../utils/firebaseErrors.js'
 import FileUploader from './FileUploader.vue'
 
 const catCssColor = (hex) => flutterColorToCss(hex ?? 0xFF1565C0)
@@ -284,11 +299,7 @@ const selectedCategory = computed(() =>
   categories.value.find(c => c.id === form.category_id) ?? null
 )
 
-const filteredCategories = computed(() => {
-  const q = catSearch.value.trim().toLowerCase()
-  if (!q) return categories.value
-  return categories.value.filter(c => c.name.toLowerCase().includes(q))
-})
+const filteredCategories = computed(() => filterCategoryOptions(categories.value, catSearch.value))
 
 // "None" only makes sense to show while it'd actually match what's typed —
 // otherwise a search for "chishtiyya" would still show an unrelated "None"
@@ -313,14 +324,19 @@ function selectCat(cat) {
 }
 
 onMounted(async () => {
-  const snap = await getDocs(collection(db, 'categories'))
-  categories.value = snap.docs.map(d => ({
-    id: d.id,
-    ...d.data(),
-    iconCode: d.data().iconCode ?? 0xe2cc,
-    colorHex: d.data().colorHex ?? 0xFF1565C0,
-  }))
-  categoriesLoading.value = false
+  try {
+    const snap = await getDocs(collection(db, 'categories'))
+    categories.value = categoryOptions(snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      iconCode: d.data().iconCode ?? 0xe2cc,
+      colorHex: d.data().colorHex ?? 0xFF1565C0,
+    })))
+  } catch (e) {
+    saveError.value = `Could not load categories: ${e.code ? `[${e.code}] ` : ''}${e.message || e}`
+  } finally {
+    categoriesLoading.value = false
+  }
 })
 
 const types = [
@@ -434,7 +450,7 @@ async function save() {
     emit('saved')
     emit('close')
   } catch (e) {
-    saveError.value = e.message
+    saveError.value = describeFirebaseError(e, 'Saving the post')
   } finally {
     saving.value = false
   }

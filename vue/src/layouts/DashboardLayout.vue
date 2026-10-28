@@ -68,6 +68,7 @@
         </div>
       </header>
       <main class="main-content">
+        <p v-if="adminBootstrapWarning" class="admin-warning" role="alert">{{ adminBootstrapWarning }}</p>
         <RouterView />
       </main>
     </div>
@@ -78,6 +79,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth.js'
+import { adminBootstrapWarning } from '../utils/adminBootstrap.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -104,6 +106,16 @@ async function handleLogout() {
 </script>
 
 <style scoped>
+.admin-warning {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #fde8e8;
+  color: #9b1c1c;
+  font-size: 13px;
+  line-height: 1.45;
+  border: 1px solid #f8b4b4;
+}
 .dashboard {
   display: flex;
   min-height: 100vh;

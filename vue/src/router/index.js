@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { signOut } from 'firebase/auth'
 import { auth } from '../fireconfigs.js'
 import { isAdmin } from '../utils/adminAccess.js'
+import { ensureAdminAccess } from '../utils/adminBootstrap.js'
 import DashboardLayout    from '../layouts/DashboardLayout.vue'
 import DashboardHome      from '../views/DashboardHome.vue'
 import PostsView          from '../views/PostsView.vue'
@@ -58,6 +59,9 @@ const guard = (user) => {
     signOut(auth)
     return '/login'
   }
+  // Sessions that were already signed in skip LoginView — register the
+  // admins/{email} doc for them too (once per session, in the background).
+  ensureAdminAccess(user)
   return true
 }
 

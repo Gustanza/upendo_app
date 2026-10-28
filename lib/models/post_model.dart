@@ -17,6 +17,9 @@ class PostModel {
   final int commentCount;
   final String? pollType;
   final List<String>? pollOptions;
+  // created_at, written by the admin dashboard (PostFormModal). Older posts
+  // may not have it.
+  final DateTime? createdAt;
 
   PostModel({
     required this.id,
@@ -33,6 +36,7 @@ class PostModel {
     this.commentCount = 0,
     this.pollType,
     this.pollOptions,
+    this.createdAt,
   });
 
   factory PostModel.fromFirestore(DocumentSnapshot doc) {
@@ -57,6 +61,9 @@ class PostModel {
       pollType: data['pollType'] as String?,
       pollOptions: data['pollOptions'] is List
           ? (data['pollOptions'] as List).map((e) => e.toString()).toList()
+          : null,
+      createdAt: data['created_at'] is Timestamp
+          ? (data['created_at'] as Timestamp).toDate()
           : null,
     );
   }

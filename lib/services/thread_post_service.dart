@@ -58,7 +58,7 @@ class ThreadPostService {
 
     final docRef = _threadPosts.doc();
     final uploaded = await AttachmentService().uploadAll(
-      '${scope.postsPath}/${docRef.id}',
+      scope.storageFolder(docRef.id, uploaderUid: uid),
       attachments,
       onProgress: onUploadProgress,
     );

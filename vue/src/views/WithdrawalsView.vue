@@ -107,6 +107,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore'
 import { ref as storageRef, getDownloadURL } from 'firebase/storage'
 import { httpsCallable } from 'firebase/functions'
+import { adminReady } from '../utils/adminBootstrap.js'
 import { db, storage, functions } from '../fireconfigs.js'
 import '../styles/admin-page.css'
 
@@ -198,6 +199,7 @@ function formatDate(val) {
 async function viewId(r) {
   idPhoto.value = { title: `${r.fullName} — ${ID_LABELS[r.idType] || r.idType}`, url: null, error: null }
   try {
+    await adminReady()
     idPhoto.value.url = await getDownloadURL(storageRef(storage, r.idPhotoPath))
   } catch (e) {
     idPhoto.value.error = e.message || String(e)
@@ -211,6 +213,7 @@ async function resolve(r, action) {
   busyId.value = r.id
   error.value = null
   try {
+    await adminReady()
     await httpsCallable(functions, 'adminResolveWithdrawal')({ withdrawalId: r.id, action, note })
   } catch (e) {
     error.value = e.message || String(e)

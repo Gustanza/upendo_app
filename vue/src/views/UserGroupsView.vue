@@ -113,6 +113,7 @@
 </template>
 
 <script setup>
+import { adminReady } from '../utils/adminBootstrap.js'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { collection, onSnapshot, doc, deleteDoc, query, orderBy, limit } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
@@ -199,7 +200,7 @@ function closeGroup() {
 
 async function run(action) {
   busy.value = true
-  try { await action() } catch (e) { detailError.value = error.value = e.message || String(e) } finally { busy.value = false }
+  try { await adminReady(); await action() } catch (e) { detailError.value = error.value = e.message || String(e) } finally { busy.value = false }
 }
 
 function deletePost(p) {

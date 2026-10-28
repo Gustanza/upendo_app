@@ -22,7 +22,7 @@
     <div v-else class="table-card">
       <table>
         <thead>
-          <tr><th>Icon</th><th>Name</th><th>Order</th><th>Main categories</th><th></th></tr>
+          <tr><th>Icon</th><th>Name</th><th title="Lower numbers appear first in the app">Position</th><th>Main categories</th><th></th></tr>
         </thead>
         <tbody>
           <tr v-for="g in groups" :key="g.id">
@@ -54,13 +54,18 @@
           <button class="close-btn" @click="showModal = false">×</button>
         </div>
         <div class="modal-body">
+          <p v-if="saveError" class="error-banner">{{ saveError }}</p>
           <div class="field">
             <label>Name</label>
             <input v-model="form.name" class="text-input" placeholder="e.g. Faith & Family" />
           </div>
           <div class="field">
-            <label>Display order (lower first)</label>
-            <input v-model.number="form.order" type="number" class="text-input" />
+            <label for="group-position">Position (lower numbers appear first)</label>
+            <input id="group-position" v-model.number="form.order" type="number" min="0" step="1" class="text-input" />
+            <p class="hint">
+              Where this group is listed on the app's Explore and Home screens: 1 is shown first, then 2, 3…
+              Groups with the same number are sorted by name. New groups default to the end of the list.
+            </p>
           </div>
           <div class="field">
             <label>Icon</label>
@@ -97,9 +102,9 @@
             </div>
             <p class="hint">Ticking a category that's in another group moves it here.</p>
           </div>
-          <p v-if="saveError" class="error-banner">{{ saveError }}</p>
         </div>
         <div class="modal-footer">
+          <span v-if="saveError" class="error-banner" style="margin-right:auto;padding:6px 10px">Not saved — see the message above.</span>
           <button class="btn-cancel" @click="showModal = false">Cancel</button>
           <button class="btn-primary" :disabled="saving || !form.name.trim()" @click="save">
             {{ saving ? 'Saving…' : 'Save Group' }}
@@ -132,6 +137,9 @@ import {
 } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
 import { MATERIAL_ICONS, COLOR_OPTIONS, flutterColorToCss, iconChar } from '../utils/iconData.js'
+import { describeFirebaseError } from '../utils/firebaseErrors.js'
+import { adminReady } from '../utils/adminBootstrap.js'
+import { nextGroupOrder, normalizeOrder, groupMembershipChanges, chunk } from '../utils/categoryGroups.js'
 import '../styles/admin-page.css'
 
 const groups      = ref([])
@@ -157,11 +165,13 @@ onMounted(() => {
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.name || '').localeCompare(b.name || ''))
     loading.value = false
   }, err => {
-    error.value = `Can't read category groups (${err.code}). Deploy the new firestore.rules and make sure your email has a doc in the "admins" collection.`
+    error.value = describeFirebaseError(err, 'Loading category groups')
     loading.value = false
   })
   unsubCats = onSnapshot(collection(db, 'categories'), snap => {
     categories.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  }, err => {
+    error.value = describeFirebaseError(err, 'Loading categories')
   })
 })
 onUnmounted(() => { unsubGroups?.(); unsubCats?.() })
@@ -188,7 +198,7 @@ function toggleMember(id) {
 
 function openCreate() {
   editing.value = null
-  Object.assign(form, { name: '', order: groups.value.length, iconCode: 0xe574, colorHex: 0xFF8B2942, memberIds: new Set() })
+  Object.assign(form, { name: '', order: nextGroupOrder(groups.value), iconCode: 0xe574, colorHex: 0xFF8B2942, memberIds: new Set() })
   saveError.value = null
   mainSearch.value = ''
   showModal.value = true
@@ -207,9 +217,9 @@ function openEdit(g) {
 
 // Firestore batches hold at most 500 writes — there are ~1000 categories.
 async function commitInChunks(updates) {
-  for (let i = 0; i < updates.length; i += 450) {
+  for (const part of chunk(updates, 450)) {
     const batch = writeBatch(db)
-    updates.slice(i, i + 450).forEach(([ref, data]) => batch.update(ref, data))
+    part.forEach(([ref, data]) => batch.update(ref, data))
     await batch.commit()
   }
 }
@@ -217,10 +227,13 @@ async function commitInChunks(updates) {
 async function save() {
   saving.value = true
   saveError.value = null
+  let step = 'Saving the group'
   try {
+    // categoryGroups writes are admin-only: don't race the sign-in bootstrap.
+    await adminReady()
     const payload = {
       name: form.name.trim(),
-      order: Number.isFinite(form.order) ? form.order : 0,
+      order: normalizeOrder(form.order, nextGroupOrder(groups.value)),
       iconCode: form.iconCode,
       colorHex: form.colorHex,
       updatedAt: serverTimestamp(),
@@ -232,18 +245,20 @@ async function save() {
     } else {
       const ref = await addDoc(collection(db, 'categoryGroups'), { ...payload, createdAt: serverTimestamp() })
       groupId = ref.id
+      // From here on a retry must update this group, not create a second one.
+      editing.value = { id: groupId, ...payload }
     }
     // Assign ticked main categories to this group; untick → ungrouped.
-    const updates = []
-    for (const c of mains.value) {
-      const wanted = form.memberIds.has(c.id)
-      if (wanted && c.groupId !== groupId) updates.push([doc(db, 'categories', c.id), { groupId, updatedAt: serverTimestamp() }])
-      if (!wanted && c.groupId === groupId) updates.push([doc(db, 'categories', c.id), { groupId: deleteField(), updatedAt: serverTimestamp() }])
-    }
+    step = 'The group was saved, but assigning its main categories'
+    const updates = groupMembershipChanges(mains.value, groupId, form.memberIds).map(([id, kind]) => [
+      doc(db, 'categories', id),
+      kind === 'set' ? { groupId, updatedAt: serverTimestamp() } : { groupId: deleteField(), updatedAt: serverTimestamp() },
+    ])
     await commitInChunks(updates)
     showModal.value = false
   } catch (e) {
-    saveError.value = e.message || String(e)
+    console.error('CategoryGroupsView.save', e)
+    saveError.value = describeFirebaseError(e, step)
   } finally {
     saving.value = false
   }
@@ -254,11 +269,14 @@ async function doDelete() {
   if (!g) return
   saving.value = true
   try {
+    await adminReady()
     await commitInChunks(mainsIn(g.id).map(c => [doc(db, 'categories', c.id), { groupId: deleteField() }]))
     await deleteDoc(doc(db, 'categoryGroups', g.id))
     deleteTarget.value = null
   } catch (e) {
-    error.value = e.message || String(e)
+    console.error('CategoryGroupsView.doDelete', e)
+    error.value = describeFirebaseError(e, 'Deleting the group')
+    deleteTarget.value = null
   } finally {
     saving.value = false
   }

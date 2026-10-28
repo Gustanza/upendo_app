@@ -58,6 +58,50 @@ describe('storage.rules', { skip: !hasEmulators && 'Storage/Firestore emulators 
     await assertFails(getBytes(ref(storageAs('mallory'), 'userGroups/g1/posts/p1/0_a.jpg')));
   });
 
+  // The paths below are the ones the app uploads to now (lib/utils/
+  // storage_paths.dart). None of them may depend on Firestore docs: in
+  // production storage.rules' firestore.get/exists are denied unless an
+  // extra IAM role is granted, which the emulator never checks. Using a
+  // conversation / group that has NO Firestore docs proves that.
+  test('1:1 chat: participants upload images/video/PDF/audio with no conversation doc; limits enforced', async () => {
+    const cid = 'alice_bob'; // never written to Firestore in this suite
+    await assertSucceeds(put('alice', `conversations/${cid}/m1/0_a.jpg`, MB, 'image/jpeg'));
+    await assertSucceeds(put('bob', `conversations/${cid}/m2/0_v.mp4`, 5 * MB, 'video/mp4'));
+    await assertSucceeds(put('alice', `conversations/${cid}/m3/0_doc.pdf`, 50 * MB, 'application/pdf'));
+    await assertSucceeds(put('bob', `conversations/${cid}/m4/0_a.m4a`, MB, 'audio/mp4'));
+    await assertSucceeds(getBytes(ref(storageAs('bob'), `conversations/${cid}/m1/0_a.jpg`)));
+    // outsiders, malformed ids, oversized/odd files
+    await assertFails(put('mallory', `conversations/${cid}/m5/0_a.jpg`, 1000, 'image/jpeg'));
+    await assertFails(getBytes(ref(storageAs('mallory'), `conversations/${cid}/m1/0_a.jpg`)));
+    await assertFails(put('alice', 'conversations/alice_bob_mallory/m1/0_a.jpg', 1000, 'image/jpeg'));
+    await assertFails(put('alice', 'conversations/alice/m1/0_a.jpg', 1000, 'image/jpeg'));
+    await assertFails(put('alice', `conversations/${cid}/m6/0_big.pdf`, 50 * MB + 1, 'application/pdf'));
+    await assertFails(put('alice', `conversations/${cid}/m6/1_x.exe`, 10, 'application/octet-stream'));
+  });
+
+  test("group photo: uploaded into the creator's own folder before the group exists", async () => {
+    await assertSucceeds(put('carol', 'userGroups/brandNew/photo/carol/1.jpg', 2000, 'image/jpeg'));
+    await assertSucceeds(getBytes(ref(storageAs('dave'), 'userGroups/brandNew/photo/carol/1.jpg')));
+    await assertFails(put('dave', 'userGroups/brandNew/photo/carol/2.jpg', 2000, 'image/jpeg'));
+    await assertFails(put('carol', 'userGroups/brandNew/photo/carol/3.pdf', 2000, 'application/pdf'));
+    await assertFails(put('carol', 'userGroups/brandNew/photo/carol/4.jpg', 5 * MB, 'image/jpeg'));
+  });
+
+  test('group post/chat files: uploader folder only, community limits, no membership lookup needed', async () => {
+    await assertSucceeds(put('bob', 'userGroups/noDocs/posts/p1/bob/0_a.jpg', 1000, 'image/jpeg'));
+    await assertSucceeds(put('bob', 'userGroups/noDocs/posts/p1/bob/1_v.mp4', 2 * MB, 'video/mp4'));
+    await assertSucceeds(put('bob', 'userGroups/noDocs/messages/m1/bob/0_d.pdf', 2 * MB, 'application/pdf'));
+    await assertSucceeds(put('bob', 'userGroups/noDocs/messages/m1/bob/1_a.mp3', MB, 'audio/mpeg'));
+    await assertSucceeds(getBytes(ref(storageAs('bob'), 'userGroups/noDocs/posts/p1/bob/0_a.jpg')));
+    await assertFails(put('mallory', 'userGroups/noDocs/posts/p1/bob/2_a.jpg', 1000, 'image/jpeg'));
+    await assertFails(put('bob', 'userGroups/noDocs/other/p1/bob/0_a.jpg', 1000, 'image/jpeg'));
+    await assertFails(put('bob', 'userGroups/noDocs/posts/p1/bob/3_big.pdf', 50 * MB + 1, 'application/pdf'));
+    // a member of g1 can read another member's file (lookup branch, needs the IAM grant in prod)
+    await assertSucceeds(put('bob', 'userGroups/g1/posts/p9/bob/0_a.jpg', 1000, 'image/jpeg'));
+    await assertSucceeds(getBytes(ref(storageAs('owner'), 'userGroups/g1/posts/p9/bob/0_a.jpg')));
+    await assertFails(getBytes(ref(storageAs('mallory'), 'userGroups/g1/posts/p9/bob/0_a.jpg')));
+  });
+
   test('withdrawal ID photos: private to the user', async () => {
     await assertSucceeds(put('alice', 'withdrawals/alice/1_id.jpg', 1000, 'image/jpeg'));
     await assertFails(put('bob', 'withdrawals/alice/2_id.jpg', 1000, 'image/jpeg'));

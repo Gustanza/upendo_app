@@ -67,6 +67,31 @@ describe('firestore.rules', { skip: !hasEmulator && 'FIRESTORE_EMULATOR_HOST not
     });
   });
 
+  describe('1:1 chat attachments', () => {
+    beforeEach(() => seed((db) => setDoc(doc(db, 'conversations/alice_bob'), {
+      participants: ['alice', 'bob'], participantNames: {}, lastMessage: null, updatedAt: Timestamp.now(),
+    })));
+    const msg = (attachments, text = '') => ({ senderId: 'alice', text, createdAt: serverTimestamp(), type: 'text', pollType: null, pollOptions: null, attachments });
+    const att = (p, type) => ({ type, url: 'https://x', path: p, name: 'n', size: 1 });
+
+    test("images, video, PDF and audio in this message's folder are accepted (text may be empty)", async () => {
+      const a = as('alice');
+      await assertSucceeds(setDoc(doc(a, 'conversations/alice_bob/messages/m1'), msg([
+        att('conversations/alice_bob/m1/0_a.jpg', 'image'), att('conversations/alice_bob/m1/1_v.mp4', 'video'),
+        att('conversations/alice_bob/m1/2_d.pdf', 'pdf'), att('conversations/alice_bob/m1/3_a.m4a', 'audio'),
+      ])));
+      await assertSucceeds(setDoc(doc(a, 'conversations/alice_bob/messages/m2'), msg([], 'just text')));
+    });
+
+    test('files from another conversation/message, or a non-participant, are refused', async () => {
+      const a = as('alice');
+      await assertFails(setDoc(doc(a, 'conversations/alice_bob/messages/m3'), msg([att('conversations/alice_carol/m3/0_a.jpg', 'image')])));
+      await assertFails(setDoc(doc(a, 'conversations/alice_bob/messages/m4'), msg([att('conversations/alice_bob/m1/0_a.jpg', 'image')])));
+      await assertFails(setDoc(doc(a, 'conversations/alice_bob/messages/m5'), msg([], '')));
+      await assertFails(setDoc(doc(as('mallory'), 'conversations/alice_bob/messages/m6'), { ...msg([att('conversations/alice_bob/m6/0_a.jpg', 'image')]), senderId: 'mallory' }));
+    });
+  });
+
   describe('referral fields and wallet are server-only', () => {
     beforeEach(() => seed(async (db) => {
       await setDoc(doc(db, 'users/alice'), { fullName: 'Alice', referredBy: 'carol', referralCode: 'AB2C' });
@@ -195,6 +220,61 @@ describe('firestore.rules', { skip: !hasEmulator && 'FIRESTORE_EMULATOR_HOST not
       await assertSucceeds(updateDoc(doc(owner, 'userGroups/g1'), { name: 'Renamed', updatedAt: serverTimestamp() }));
       await assertFails(deleteDoc(doc(carol, 'userGroups/g1')));
       await assertSucceeds(deleteDoc(doc(owner, 'userGroups/g1')));
+    });
+
+    // UserGroupService.createGroup now uploads the picture first and
+    // writes photoUrl/photoPath in the same batch as the group.
+    test("group picture: must be a file in the owner's own photo folder of THIS group", async () => {
+      const db = as('owner');
+      const make = (id, photoPath) => {
+        const batch = writeBatch(db);
+        batch.set(doc(db, `userGroups/${id}`), {
+          subcategoryId: 'c1', name: 'Readers', description: '', ownerId: 'owner', ownerName: 'O',
+          photoUrl: 'https://firebasestorage.googleapis.com/v0/b/x/o/y?alt=media&token=t', photoPath,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        });
+        batch.set(doc(db, `userGroups/${id}/members/owner`), { name: 'O', role: 'owner', joinedAt: serverTimestamp() });
+        return batch.commit();
+      };
+      await assertSucceeds(make('gp1', 'userGroups/gp1/photo/owner/1.jpg'));
+      await assertFails(make('gp2', 'userGroups/gp2/photo/bob/1.jpg'));       // someone else's upload
+      await assertFails(make('gp3', 'userGroups/other/photo/owner/1.jpg'));   // another group's folder
+      await assertFails(make('gp4', 'userGroups/gp4/photo/owner/a/b.jpg'));
+      // Editing: the owner swaps the picture; still has to be their folder.
+      await assertSucceeds(updateDoc(doc(db, 'userGroups/gp1'), {
+        name: 'Readers', description: '', photoUrl: 'https://x/2', photoPath: 'userGroups/gp1/photo/owner/2.jpg', updatedAt: serverTimestamp(),
+      }));
+      await assertFails(updateDoc(doc(db, 'userGroups/gp1'), { photoUrl: 'https://x/3', photoPath: 'userGroups/gp1/photo/bob/3.jpg' }));
+      // A rename without touching the picture is unaffected.
+      await assertSucceeds(updateDoc(doc(db, 'userGroups/gp1'), { name: 'R2', updatedAt: serverTimestamp() }));
+    });
+
+    test("group posts/messages: attachments must be in the author's folder for that doc", async () => {
+      await createGroup(as('owner'), 'owner');
+      const bob = as('bob');
+      await assertSucceeds(setDoc(doc(bob, 'userGroups/g1/members/bob'), { name: 'B', role: 'member', joinedAt: serverTimestamp() }));
+      const att = (p, type = 'image') => ({ type, url: 'https://x', path: p, name: 'a', size: 1 });
+      const files = (kind, id, uid) => ['0_a.jpg', '1_v.mp4', '2_d.pdf', '3_a.mp3']
+        .map((f, i) => att(`userGroups/g1/${kind}/${id}/${uid}/${f}`, ['image', 'video', 'pdf', 'audio'][i]));
+      await assertSucceeds(setDoc(doc(bob, 'userGroups/g1/posts/p1'), { ...post('bob'), attachments: files('posts', 'p1', 'bob') }));
+      await assertSucceeds(setDoc(doc(bob, 'userGroups/g1/messages/m1'), {
+        senderId: 'bob', senderName: 'B', text: '', createdAt: serverTimestamp(), attachments: files('messages', 'm1', 'bob'),
+      }));
+      // Someone else's files, another doc's folder, the legacy flat path, or a missing path are refused.
+      await assertFails(setDoc(doc(bob, 'userGroups/g1/posts/p2'), { ...post('bob'), attachments: files('posts', 'p2', 'owner') }));
+      await assertFails(setDoc(doc(bob, 'userGroups/g1/posts/p3'), { ...post('bob'), attachments: files('posts', 'p1', 'bob') }));
+      await assertFails(setDoc(doc(bob, 'userGroups/g1/posts/p4'), { ...post('bob'), attachments: [att('userGroups/g1/posts/p4/0_a.jpg')] }));
+      await assertFails(setDoc(doc(bob, 'userGroups/g1/posts/p5'), { ...post('bob'), attachments: [{ type: 'image', url: 'https://x' }] }));
+      await assertFails(setDoc(doc(bob, 'userGroups/g1/messages/m2'), {
+        senderId: 'bob', text: 'x', createdAt: serverTimestamp(), attachments: [att('conversations/a_b/m2/0_a.jpg')],
+      }));
+      // Ten attachments (the cap) are all checked; one bad entry at the end is refused.
+      const ten = Array.from({ length: 10 }, (_, i) => att(`userGroups/g1/posts/p6/bob/${i}_a.pdf`, 'pdf'));
+      await assertSucceeds(setDoc(doc(bob, 'userGroups/g1/posts/p6'), { ...post('bob'), attachments: ten }));
+      const badLast = [...ten.slice(0, 9).map((x) => ({ ...x, path: x.path.replace('/p6/', '/p7/') })), att('userGroups/g1/posts/p7/owner/9_a.pdf', 'pdf')];
+      await assertFails(setDoc(doc(bob, 'userGroups/g1/posts/p7'), { ...post('bob'), attachments: badLast }));
+      // Non-members still can't post even with correctly placed files.
+      await assertFails(setDoc(doc(as('zed'), 'userGroups/g1/posts/p8'), { ...post('zed'), attachments: files('posts', 'p8', 'zed') }));
     });
 
     test('admins can read and delete any group content', async () => {

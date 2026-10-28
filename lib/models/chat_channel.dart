@@ -7,9 +7,14 @@ class ChatChannel {
   /// Firestore collection holding the message docs.
   final String messagesPath;
 
-  /// Storage folder prefix for a message's attachments; the message id is
-  /// appended. Must match the paths allowed by storage.rules.
+  /// Storage folder prefix for a message's attachments; the message id (and,
+  /// with [uploaderFolders], the sender's uid) is appended. Must match the
+  /// paths allowed by storage.rules — see utils/storage_paths.dart.
   final String storagePrefix;
+
+  /// Attachments go in a per-sender subfolder ({prefix}/{messageId}/{uid}),
+  /// which storage.rules can authorise without a Firestore lookup.
+  final bool uploaderFolders;
 
   /// Set for private conversations only — enables "delete chat for me"
   /// filtering (see chat_visibility.dart).
@@ -28,6 +33,7 @@ class ChatChannel {
   const ChatChannel({
     required this.messagesPath,
     required this.storagePrefix,
+    this.uploaderFolders = false,
     this.conversationId,
     this.showSenderNames = false,
     this.allowDeletingMessages = false,
@@ -36,7 +42,8 @@ class ChatChannel {
   });
 
   /// Private 1:1 chat. Storage keeps its original layout
-  /// (conversations/{id}/{messageId}/…).
+  /// (conversations/{id}/{messageId}/…): the id itself names both
+  /// participants, which is what storage.rules checks.
   factory ChatChannel.conversation(String conversationId) => ChatChannel(
         messagesPath: 'conversations/$conversationId/messages',
         storagePrefix: 'conversations/$conversationId',
@@ -57,13 +64,15 @@ class ChatChannel {
       ChatChannel(
         messagesPath: 'userGroups/$groupId/messages',
         storagePrefix: 'userGroups/$groupId/messages',
+        uploaderFolders: true,
         showSenderNames: true,
         allowDeletingMessages: true,
         moderatorId: ownerId,
         limits: MediaLimits.community,
       );
 
-  String storageFolder(String messageId) => '$storagePrefix/$messageId';
+  String storageFolder(String messageId, {required String uploaderUid}) =>
+      uploaderFolders ? '$storagePrefix/$messageId/$uploaderUid' : '$storagePrefix/$messageId';
 
   bool canDelete({required String senderId, required String? myUid}) =>
       allowDeletingMessages &&

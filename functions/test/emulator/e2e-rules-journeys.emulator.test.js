@@ -104,17 +104,21 @@ describe('E2E rules journeys', { skip: !hasEmulators && 'Storage/Firestore emula
   test('user group journey: create with photo → outsider blocked → joins → posts with links → owner bans → cannot rejoin/post', async () => {
     const owner = as('own'); const bob = as('bob');
     const gid = 'grp1';
-    // UserGroupService.createGroup batch
+    // UserGroupService.createGroup: picture uploaded FIRST (no group doc yet),
+    // then group + photoUrl/photoPath + owner membership in one batch.
+    await assertSucceeds(put(storageAs('own'), `userGroups/${gid}/photo/own/1.jpg`, 2000, 'image/jpeg'));
     const b = writeBatch(owner);
     b.set(doc(owner, 'userGroups', gid), {
       subcategoryId: 'sub1', name: 'Wapenzi wa Vitabu', description: 'd', ownerId: 'own', ownerName: 'Own',
+      photoUrl: 'https://x', photoPath: `userGroups/${gid}/photo/own/1.jpg`,
       createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
     });
     b.set(doc(owner, 'userGroups', gid, 'members', 'own'), { name: 'Own', role: 'owner', joinedAt: serverTimestamp() });
     await assertSucceeds(b.commit());
-    // _uploadPhoto then update
-    await assertSucceeds(put(storageAs('own'), `userGroups/${gid}/photo/1.jpg`, 2000, 'image/jpeg'));
-    await assertSucceeds(updateDoc(doc(owner, 'userGroups', gid), { photoUrl: 'https://x', photoPath: `userGroups/${gid}/photo/1.jpg`, updatedAt: serverTimestamp() }));
+    assert.equal((await getDoc(doc(bob, 'userGroups', gid))).data().photoUrl, 'https://x');
+    // updateGroup with a new picture
+    await assertSucceeds(put(storageAs('own'), `userGroups/${gid}/photo/own/2.jpg`, 2000, 'image/jpeg'));
+    await assertSucceeds(updateDoc(doc(owner, 'userGroups', gid), { name: 'Wapenzi wa Vitabu', description: 'd', photoUrl: 'https://y', photoPath: `userGroups/${gid}/photo/own/2.jpg`, updatedAt: serverTimestamp() }));
 
     // bob not yet a member: cannot post, read, chat, or upload
     const post = (uid, extra = {}) => ({ authorId: uid, authorName: uid, text: 'soma hii', imageUrl: null, createdAt: serverTimestamp(), type: 'text', pollType: null, pollOptions: null, ...extra });
@@ -131,7 +135,20 @@ describe('E2E rules journeys', { skip: !hasEmulators && 'Storage/Firestore emula
     const pRef = doc(collection(bob, 'userGroups', gid, 'posts'));
     await assertSucceeds(setDoc(pRef, post('bob', { links: ['https://example.com/a'] })));
     await assertSucceeds(setDoc(doc(collection(bob, 'userGroups', gid, 'messages')), { senderId: 'bob', senderName: 'bob', text: 'hi', createdAt: serverTimestamp(), type: 'text' }));
-    await assertSucceeds(put(storageAs('bob'), `userGroups/${gid}/posts/${pRef.id}/0_a.jpg`, 1000, 'image/jpeg'));
+    // ThreadPostService.createPost in a group: upload to posts/{id}/{uid}/ then write the doc
+    const p2 = doc(collection(bob, 'userGroups', gid, 'posts'));
+    const files = [['0_a.jpg', 'image/jpeg', 'image'], ['1_v.mp4', 'video/mp4', 'video'], ['2_d.pdf', 'application/pdf', 'pdf'], ['3_s.mp3', 'audio/mpeg', 'audio']];
+    for (const [name, ct] of files) {
+      await assertSucceeds(put(storageAs('bob'), `userGroups/${gid}/posts/${p2.id}/bob/${name}`, 1000, ct));
+    }
+    await assertSucceeds(setDoc(p2, post('bob', {
+      attachments: files.map(([name, , type]) => ({ type, url: 'https://x', path: `userGroups/${gid}/posts/${p2.id}/bob/${name}`, name, size: 1000 })),
+    })));
+    // ConversationService.sendTo in the group chat
+    const m2 = doc(collection(bob, 'userGroups', gid, 'messages'));
+    await assertSucceeds(put(storageAs('bob'), `userGroups/${gid}/messages/${m2.id}/bob/0_a.pdf`, 1000, 'application/pdf'));
+    await assertSucceeds(setDoc(m2, { senderId: 'bob', senderName: 'bob', text: '', createdAt: serverTimestamp(), type: 'text',
+      attachments: [{ type: 'pdf', url: 'https://x', path: `userGroups/${gid}/messages/${m2.id}/bob/0_a.pdf` }] }));
     await assertSucceeds(setDoc(doc(bob, 'userGroups', gid, 'posts', pRef.id, 'likes', 'bob'), { createdAt: serverTimestamp() }));
     // bob cannot remove the owner or ban anyone, cannot edit the group
     await assertFails(deleteDoc(doc(bob, 'userGroups', gid, 'members', 'own')));

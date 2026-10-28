@@ -96,7 +96,7 @@ class AttachmentService {
       final ref = storage.ref(path);
       final task = ref.putFile(
         File(item.localPath),
-        SettableMetadata(contentType: _contentType(item)),
+        SettableMetadata(contentType: contentTypeFor(item)),
       );
       final sub = task.snapshotEvents.listen((s) {
         sent[i] = s.bytesTransferred;
@@ -131,7 +131,8 @@ class AttachmentService {
   static String _safeName(String name) =>
       name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
 
-  static String _contentType(PendingAttachment item) {
+  /// MIME type sent with an upload — storage.rules checks it.
+  static String contentTypeFor(PendingAttachment item) {
     final ext = item.name.split('.').last.toLowerCase();
     switch (item.type) {
       case Attachment.pdf:

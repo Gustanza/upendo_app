@@ -236,6 +236,7 @@
 </template>
 
 <script setup>
+import { adminReady } from '../utils/adminBootstrap.js'
 import { ref, computed, watch, onMounted, onUnmounted, reactive } from 'vue'
 import {
   collection, onSnapshot,
@@ -338,6 +339,7 @@ function tsToInputDate(val) {
 // ── actions ───────────────────────────────────────────────────────────────────
 
 async function toggleActive(user) {
+  await adminReady()
   await updateDoc(doc(db, 'users', user.id), { isActive: !user.isActive })
 }
 
@@ -357,6 +359,7 @@ async function saveUser() {
     } else {
       payload.expire_date = null
     }
+    await adminReady()
     await updateDoc(doc(db, 'users', editingUser.value.id), payload)
     editingUser.value = null
   } finally {
@@ -370,6 +373,7 @@ async function doDelete() {
   if (!deleteTarget.value) return
   deleting.value = true
   try {
+    await adminReady()
     await deleteDoc(doc(db, 'users', deleteTarget.value.id))
     deleteTarget.value = null
   } finally {

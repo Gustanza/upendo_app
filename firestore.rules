@@ -8,13 +8,37 @@ service cloud.firestore {
     }
 
     // Admins: a verified Google account whose lower-cased email has a doc
-    // in /admins (created by hand in the Firebase console — no client can
-    // write it). Keep it in sync with the dashboard's VITE_ADMIN_EMAILS.
+    // in /admins. No client can write it — the ensureAdmin callable creates
+    // it for emails in the server-side ADMIN_EMAILS param (the dashboard
+    // calls it after sign-in), or it's added by hand in the console. Keep
+    // ADMIN_EMAILS in sync with the dashboard's VITE_ADMIN_EMAILS.
     // Same check as functions/admin/isAdmin.js and storage.rules.
     function isAdmin() {
       return signedIn()
         && request.auth.token.get('email_verified', false) == true
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.get('email', '').lower()));
+    }
+
+    // Every attachment of a post/message must be a file in the Storage
+    // folder [prefix] (the doc's own folder for its author). storage.rules
+    // authorises uploads from the path alone — no cross-service Firestore
+    // lookup, which production denies unless an extra IAM role is granted —
+    // so this is where "only members/participants attach files" is tied
+    // together. Rules have no loops: the ≤10 entries are checked one by one.
+    function attachmentOk(list, i, prefix) {
+      return list.size() <= i
+        || (list[i] is map
+            && list[i].get('path', '') is string
+            && list[i].get('path', '').matches(prefix + '[^/]+'));
+    }
+    function attachmentsUnder(data, prefix) {
+      let list = data.get('attachments', []);
+      return list is list && list.size() <= 10
+        && attachmentOk(list, 0, prefix) && attachmentOk(list, 1, prefix)
+        && attachmentOk(list, 2, prefix) && attachmentOk(list, 3, prefix)
+        && attachmentOk(list, 4, prefix) && attachmentOk(list, 5, prefix)
+        && attachmentOk(list, 6, prefix) && attachmentOk(list, 7, prefix)
+        && attachmentOk(list, 8, prefix) && attachmentOk(list, 9, prefix);
     }
 
     match /admins/{email} {
@@ -162,7 +186,11 @@ service cloud.firestore {
           && request.resource.data.get('attachments', []) is list
           && request.resource.data.get('attachments', []).size() <= 10
           && (request.resource.data.text.size() > 0
-              || request.resource.data.get('attachments', []).size() > 0);
+              || request.resource.data.get('attachments', []).size() > 0)
+          // Files live in this message's folder (storage.rules lets only
+          // the two participants upload there).
+          && attachmentsUnder(request.resource.data,
+               'conversations/' + conversationId + '/' + messageId + '/');
         // No editing or deleting messages — out of scope for this feature.
         allow update: if false;
         allow delete: if false;
@@ -348,6 +376,19 @@ service cloud.firestore {
     function isGroupOwner(groupId) {
       return signedIn() && get(groupDoc(groupId)).data.ownerId == request.auth.uid;
     }
+    // The group picture must be a file the owner (the caller — create and
+    // update are owner-only) uploaded to userGroups/{g}/photo/{theirUid}/.
+    function groupPhotoOk(groupId, data) {
+      return data.get('photoPath', '') is string
+        && data.get('photoPath', '').matches('userGroups/' + groupId + '/photo/' + request.auth.uid + '/[^/]+')
+        && data.get('photoUrl', '') is string
+        && data.get('photoUrl', '').size() <= 2048;
+    }
+    // Group post/message files: userGroups/{g}/{kind}/{docId}/{authorUid}/…
+    function groupFilesOk(groupId, kind, docId) {
+      return attachmentsUnder(request.resource.data,
+        'userGroups/' + groupId + '/' + kind + '/' + docId + '/' + request.auth.uid + '/');
+    }
 
     match /userGroups/{groupId} {
       allow read: if signedIn();
@@ -363,7 +404,9 @@ service cloud.firestore {
         // memberCount is server-only (updateGroupMemberCount).
         && request.resource.data.keys().hasOnly([
              'subcategoryId', 'name', 'description', 'ownerId', 'ownerName',
-             'photoUrl', 'photoPath', 'createdAt', 'updatedAt']);
+             'photoUrl', 'photoPath', 'createdAt', 'updatedAt'])
+        && (!request.resource.data.keys().hasAny(['photoUrl', 'photoPath'])
+            || groupPhotoOk(groupId, request.resource.data));
       allow update: if signedIn()
         && resource.data.ownerId == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys()
@@ -372,7 +415,9 @@ service cloud.firestore {
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 80
         && request.resource.data.get('description', '') is string
-        && request.resource.data.get('description', '').size() <= 500;
+        && request.resource.data.get('description', '').size() <= 500
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoUrl', 'photoPath'])
+            || groupPhotoOk(groupId, request.resource.data));
       allow delete: if signedIn()
         && (resource.data.ownerId == request.auth.uid || isAdmin());
 
@@ -412,7 +457,8 @@ service cloud.firestore {
 
       match /posts/{postId} {
         allow read: if isGroupMember(groupId) || isAdmin();
-        allow create: if isGroupMember(groupId) && validPost(request.resource.data);
+        allow create: if isGroupMember(groupId) && validPost(request.resource.data)
+          && groupFilesOk(groupId, 'posts', postId);
         allow update: if isGroupMember(groupId)
           && resource.data.authorId == request.auth.uid
           && countersUntouched();
@@ -442,7 +488,8 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read: if isGroupMember(groupId) || isAdmin();
-        allow create: if isGroupMember(groupId) && validMessage(request.resource.data);
+        allow create: if isGroupMember(groupId) && validMessage(request.resource.data)
+          && groupFilesOk(groupId, 'messages', messageId);
         allow update: if false;
         allow delete: if signedIn() && (
           resource.data.senderId == request.auth.uid

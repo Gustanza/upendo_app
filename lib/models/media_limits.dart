@@ -50,9 +50,15 @@ class MediaLimits {
     maxVideoDuration: Duration(minutes: 10),
   );
 
-  /// Private 1:1 chat: images, one video of any length, PDFs of any size
-  /// and audio, max 10 per message.
-  static const directMessage = MediaLimits();
+  /// Private 1:1 chat: up to 5 images, one video ≤ 5 min, PDFs and audio
+  /// ≤ 50 MB each, max 10 per message (storage.rules enforces the same
+  /// type/size caps on conversations/…).
+  static const directMessage = MediaLimits(
+    maxVideoDuration: Duration(minutes: 5),
+    maxPdfBytes: 50 * megabyte,
+    maxAudioBytes: 50 * megabyte,
+    maxVideoBytes: 1024 * megabyte,
+  );
 
   /// Subcategory feeds/chat and user groups: video ≤ 5 min, up to 5 images,
   /// PDFs and audio ≤ 50 MB each (also enforced in storage.rules).

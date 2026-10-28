@@ -26,54 +26,41 @@ class CategoryPostsScreen extends StatefulWidget {
 
 class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
   final PostService _postService = PostService();
+  // Live, so posts the admin publishes (or edits) show up without reopening
+  // the screen, and like/comment counters refresh after viewing a post.
+  // A broadcast stream: the list and the header's count both listen.
+  late final Stream<List<PostModel>> _topics =
+      _postService.watchTopics(widget.category).asBroadcastStream();
   List<PostModel> _posts = [];
-  bool _isLoading = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadPosts();
-  }
-
-  Future<void> _openPostAndRefresh(PostModel post) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => PostDetailScreen(post: post)),
-    );
-    final updated = await _postService.getPostById(post.id);
-    if (updated == null || !mounted) return;
-    setState(() {
-      final index = _posts.indexWhere((p) => p.id == updated.id);
-      if (index != -1) _posts[index] = updated;
-    });
-  }
-
-  Future<void> _loadPosts() async {
-    try {
-      final posts = await _postService.getPostsByCategory(widget.category.id);
-      if (mounted) {
-        setState(() {
-          _posts = posts;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading category posts: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
+  Future<void> _openPost(PostModel post) => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PostDetailScreen(post: post)),
+      );
 
   @override
   Widget build(BuildContext context) {
-    final body = _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : _posts.isEmpty
-        ? _buildEmptyState()
-        : _buildPostsList();
+    final body = StreamBuilder<List<PostModel>>(
+      stream: _topics,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          debugPrint('Error loading category posts: ${snapshot.error}');
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                context.l10n.errorWithDetails('${snapshot.error}'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ),
+          );
+        }
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        _posts = snapshot.data!;
+        return _posts.isEmpty ? _buildEmptyState() : _buildPostsList();
+      },
+    );
     if (widget.embedded) return body;
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -130,11 +117,14 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      context.l10n.topicsFound(_posts.length),
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
+                    StreamBuilder<List<PostModel>>(
+                      stream: _topics,
+                      builder: (context, snap) => Text(
+                        context.l10n.topicsFound(snap.data?.length ?? _posts.length),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ],
@@ -194,7 +184,7 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () => _openPostAndRefresh(post),
+              onTap: () => _openPost(post),
               borderRadius: BorderRadius.circular(20),
               child: Padding(
                 padding: const EdgeInsets.all(12),

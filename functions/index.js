@@ -35,6 +35,7 @@ const scopedFeeds                        = require('./interactions/scopedFeeds')
 const { generateReferralCode, applyReferralCode } = require('./referrals/index');
 const { requestWithdrawal, adminResolveWithdrawal } = require('./wallet/withdrawals');
 const { creditReferralOnCompletion } = require('./wallet/commission');
+const { ensureAdmin }                    = require('./admin/ensureAdmin');
 
 exports.subscribe                      = subscribe;
 exports.resolvePayment                 = resolvePayment;
@@ -72,6 +73,9 @@ exports.applyReferralCode              = applyReferralCode;
 exports.requestWithdrawal              = requestWithdrawal;
 exports.adminResolveWithdrawal         = adminResolveWithdrawal;
 exports.creditReferralOnCompletion     = creditReferralOnCompletion;
+
+// Admin dashboard bootstrap: creates admins/{email} for allowlisted accounts.
+exports.ensureAdmin                    = ensureAdmin;
 
 exports.registerFcmToken = onCall(async (request) => {
   const token = request.data.token;

@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
+import '../models/category_model.dart';
 import '../models/post_model.dart';
+import '../utils/topic_posts.dart';
 
 class PostService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -80,12 +83,28 @@ class PostService {
     return PostModel.fromFirestore(doc);
   }
 
-  Future<List<PostModel>> getPostsByCategory(String categoryId) async {
-    QuerySnapshot snapshot = await _db
+  /// Live Topics list of [category]: its own posts plus, for a
+  /// subcategory, its main category's (see utils/topic_posts.dart). A
+  /// single-field `whereIn` with client-side ordering needs no composite
+  /// index, and (unlike orderBy('created_at')) keeps older posts that have
+  /// no created_at. A doc that can't be parsed is skipped instead of failing
+  /// the whole list, which used to show up as "No topics yet".
+  Stream<List<PostModel>> watchTopics(Category category) {
+    return _db
         .collection('posts')
-        .where('category_id', isEqualTo: categoryId)
-        .get();
-    return snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList();
+        .where('category_id', whereIn: topicCategoryIds(category))
+        .snapshots()
+        .map((snap) {
+      final posts = <PostModel>[];
+      for (final doc in snap.docs) {
+        try {
+          posts.add(PostModel.fromFirestore(doc));
+        } catch (e) {
+          debugPrint('PostService.watchTopics: skipping posts/${doc.id}: $e');
+        }
+      }
+      return orderTopics(posts, category);
+    });
   }
 
   Future<List<PostModel>> searchPosts(String query) async {

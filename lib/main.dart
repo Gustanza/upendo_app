@@ -9,6 +9,9 @@ import 'package:upendo_app/utils/start_screen.dart';
 import 'package:upendo_app/views/welcome_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+// TEST-ONLY: no-op unless a debug build is started with
+// --dart-define=USE_FIREBASE_EMULATORS=true (see lib/dev/emulator_harness.dart).
+import 'dev/emulator_harness.dart';
 
 // ...
 const lokol = "192.168.2.197";
@@ -21,6 +24,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // TEST-ONLY (debug + USE_FIREBASE_EMULATORS): local emulators + test login.
+  await connectFirebaseEmulatorsIfRequested();
+  await signInTestAccountIfRequested();
   // Restore the saved UI language before the first frame (defaults to sw).
   await LocaleController.instance.load();
   // google_sign_in v7 must be initialised once before authenticate(). The

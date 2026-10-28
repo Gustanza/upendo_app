@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/attachment_model.dart';
 import '../models/user_group_model.dart';
+import '../utils/storage_paths.dart';
+import 'attachment_service.dart';
 
 /// User groups inside subcategories. Every rule that matters (only members
 /// post/chat, only the owner edits/removes, removed members can't rejoin)
@@ -54,9 +56,17 @@ class UserGroupService {
         .toList());
   }
 
-  /// Creates the group and its owner membership in one batch (the rules
-  /// verify the owner member doc against the group being created), then
-  /// uploads the optional profile picture.
+  /// Uploads the optional profile picture FIRST (into the creator's own
+  /// folder — storage.rules needs no group doc for that), then creates the
+  /// group with photoUrl/photoPath and its owner membership in one batch
+  /// (the rules verify the owner member doc against the group being
+  /// created). So either the whole group appears, picture included, or —
+  /// if the upload fails — nothing is created and retrying is safe.
+  ///
+  /// Previously the group was written first and the picture uploaded after
+  /// it, guarded by a Firestore owner lookup in storage.rules that
+  /// production refused: the group appeared without a picture and the form
+  /// showed a "[firebase_storage/unauthorized]" error.
   Future<String> createGroup({
     required String subcategoryId,
     required String name,
@@ -65,6 +75,7 @@ class UserGroupService {
   }) async {
     final myName = await _myName();
     final ref = _groups.doc();
+    final photoFields = photo == null ? null : await _uploadPhoto(ref.id, photo);
     final batch = _db.batch()
       ..set(ref, {
         'subcategoryId': subcategoryId,
@@ -72,6 +83,7 @@ class UserGroupService {
         'description': description.trim(),
         'ownerId': _uid,
         'ownerName': myName,
+        ...?photoFields,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       })
@@ -81,7 +93,6 @@ class UserGroupService {
         'joinedAt': FieldValue.serverTimestamp(),
       });
     await batch.commit();
-    if (photo != null) await _uploadPhoto(ref.id, photo);
     return ref.id;
   }
 
@@ -91,29 +102,28 @@ class UserGroupService {
     required String description,
     PendingAttachment? newPhoto,
   }) async {
+    final photoFields = newPhoto == null ? null : await _uploadPhoto(groupId, newPhoto);
     await _groups.doc(groupId).update({
       'name': name.trim(),
       'description': description.trim(),
+      ...?photoFields,
       'updatedAt': FieldValue.serverTimestamp(),
     });
-    if (newPhoto != null) await _uploadPhoto(groupId, newPhoto);
   }
 
   // A fresh file name each time so cached copies of the old picture don't
   // linger; the previous file is removed with the group by cleanupUserGroup.
-  Future<void> _uploadPhoto(String groupId, PendingAttachment photo) async {
+  // Returns the fields that make it the group's picture.
+  Future<Map<String, Object>> _uploadPhoto(String groupId, PendingAttachment photo) async {
     final ext = photo.name.contains('.') ? photo.name.split('.').last.toLowerCase() : 'jpg';
-    final path = 'userGroups/$groupId/photo/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    final path = StoragePaths.groupPhoto(
+        groupId, _uid, '${DateTime.now().millisecondsSinceEpoch}.$ext');
     final ref = FirebaseStorage.instance.ref(path);
     await ref.putFile(
       File(photo.localPath),
-      SettableMetadata(contentType: ext == 'png' ? 'image/png' : 'image/jpeg'),
+      SettableMetadata(contentType: AttachmentService.contentTypeFor(photo)),
     );
-    await _groups.doc(groupId).update({
-      'photoUrl': await ref.getDownloadURL(),
-      'photoPath': path,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    return {'photoUrl': await ref.getDownloadURL(), 'photoPath': path};
   }
 
   /// Owner (or admin) only. Posts, chat, members and Storage files are

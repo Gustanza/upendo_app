@@ -153,7 +153,7 @@ class ConversationService {
       senderName = (myDoc.data()?['fullName'] as String?) ?? '';
     }
     final uploaded = await AttachmentService().uploadAll(
-      channel.storageFolder(docRef.id),
+      channel.storageFolder(docRef.id, uploaderUid: uid),
       attachments,
       onProgress: onUploadProgress,
     );

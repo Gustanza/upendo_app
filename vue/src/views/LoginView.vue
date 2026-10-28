@@ -29,6 +29,7 @@ import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
 import { useRouter } from 'vue-router'
 import { auth } from '../fireconfigs.js'
 import { isAdmin } from '../utils/adminAccess.js'
+import { ensureAdminAccess } from '../utils/adminBootstrap.js'
 
 const loading  = ref(false)
 const errorMsg = ref('')
@@ -61,6 +62,9 @@ async function signInWithGoogle() {
       errorMsg.value = `${user.email} is not authorised to access the admin dashboard.`
       return
     }
+    // Registers admins/{email} server-side (if this email is in the
+    // functions' ADMIN_EMAILS) so admin-only writes pass the security rules.
+    await ensureAdminAccess(user)
     router.push('/')
   } catch (e) {
     if (!CANCEL_CODES.includes(e.code)) errorMsg.value = friendlyError(e.code)

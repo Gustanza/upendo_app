@@ -17,8 +17,13 @@ class ThreadScope {
   /// May delete anyone's post or reply in this feed (a group's owner).
   final String? moderatorId;
 
+  /// Attachments go in a per-author subfolder ({postsPath}/{postId}/{uid});
+  /// see utils/storage_paths.dart for why.
+  final bool uploaderFolders;
+
   const ThreadScope({
     required this.postsPath,
+    this.uploaderFolders = false,
     this.limits = MediaLimits.community,
     this.allowLinks = false,
     this.moderatorId,
@@ -35,11 +40,16 @@ class ThreadScope {
 
   factory ThreadScope.group(String groupId, {required String ownerId}) => ThreadScope(
         postsPath: 'userGroups/$groupId/posts',
+        uploaderFolders: true,
         allowLinks: true,
         moderatorId: ownerId,
       );
 
   bool get isWall => postsPath == wall.postsPath;
+
+  /// Where a post's attachments are uploaded (must match storage.rules).
+  String storageFolder(String postId, {required String uploaderUid}) =>
+      uploaderFolders ? '$postsPath/$postId/$uploaderUid' : '$postsPath/$postId';
 
   bool canDelete({required String authorId, required String? myUid}) =>
       myUid != null && (authorId == myUid || moderatorId == myUid);

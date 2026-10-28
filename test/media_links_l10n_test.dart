@@ -69,8 +69,10 @@ void main() {
       final g = ThreadScope.group('g1', ownerId: 'owner');
       expect(g.postsPath, 'userGroups/g1/posts');
       expect(g.allowLinks, isTrue);
-      expect(ChatChannel.conversation('a_b').storageFolder('m1'), 'conversations/a_b/m1');
-      expect(ChatChannel.subcategory('c1').storageFolder('m1'), 'subcategoryFeeds/c1/messages/m1');
+      expect(ChatChannel.conversation('a_b').storageFolder('m1', uploaderUid: 'a'),
+          'conversations/a_b/m1');
+      expect(ChatChannel.subcategory('c1').storageFolder('m1', uploaderUid: 'a'),
+          'subcategoryFeeds/c1/messages/m1');
       expect(ChatChannel.group('g1', ownerId: 'o').messagesPath, 'userGroups/g1/messages');
     });
 
