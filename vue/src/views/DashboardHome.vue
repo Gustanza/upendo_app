@@ -1,6 +1,13 @@
 <template>
   <div class="overview">
 
+    <!-- Posts whose category was deleted are invisible in the app -->
+    <div v-if="loaded && orphanCount" class="orphan-banner" role="alert">
+      <strong>{{ orphanCount }} post{{ orphanCount === 1 ? ' is' : 's are' }} not linked to any existing category and
+        {{ orphanCount === 1 ? 'is' : 'are' }} hidden in the app.</strong>
+      <router-link to="/posts?filter=orphans" class="see-all">Reassign them →</router-link>
+    </div>
+
     <!-- Stat cards -->
     <div class="stat-grid">
       <div class="stat-card">
@@ -73,22 +80,30 @@
       <!-- Categories overview -->
       <div class="card">
         <div class="card-header">
-          <h3>Categories</h3>
+          <h3>Posts per Category</h3>
           <router-link to="/categories" class="see-all">Manage →</router-link>
         </div>
         <div class="cat-list">
-          <div v-for="cat in categories.slice(0, 6)" :key="cat.id" class="cat-row">
+          <div v-for="cat in topCategories" :key="cat.id" class="cat-row">
             <div class="cat-badge" :style="{ background: cssColor(cat.colorHex) }">
               <span class="mi">{{ iconChar(cat.iconCode) }}</span>
             </div>
-            <span class="cat-name">{{ cat.name }}</span>
+            <span class="cat-name">{{ cat.label }}</span>
             <span v-if="cat.isProtected" class="lock-chip">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               Protected
             </span>
-            <span class="post-count">{{ postCountFor(cat.id) }} posts</span>
+            <span class="post-count">
+              {{ cat.total }} post{{ cat.total === 1 ? '' : 's' }}
+              <template v-if="cat.subCount && cat.total !== cat.direct"> (incl. subcategories)</template>
+            </span>
+          </div>
+          <div v-if="orphanCount" class="cat-row orphan-row">
+            <span class="cat-name">Deleted / missing category</span>
+            <span class="post-count">{{ orphanCount }} post{{ orphanCount === 1 ? '' : 's' }} hidden</span>
           </div>
           <div v-if="!categories.length" class="empty-hint">No categories yet.</div>
+          <div v-else-if="!topCategories.length" class="empty-hint">No category has any posts yet.</div>
         </div>
       </div>
     </div>
@@ -119,7 +134,10 @@
               </div>
             </td>
             <td><span class="type-pill" :style="{ background: typeColor(post.type) + '22', color: typeColor(post.type) }">{{ post.type }}</span></td>
-            <td class="muted">{{ categoryName(post.category_id) }}</td>
+            <td class="muted">
+              <span v-if="isOrphan(post)" class="orphan-chip">Category deleted</span>
+              <template v-else>{{ categoryName(post.category_id) }}</template>
+            </td>
             <td>
               <svg v-if="post.featured" viewBox="0 0 24 24" width="16" fill="#f59e0b" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
               <span v-else class="muted">—</span>
@@ -144,6 +162,8 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
 import { flutterColorToCss, iconChar } from '../utils/iconData.js'
+import { categoryOptions } from '../utils/categoryOptions.js'
+import { categoryIdSet, isOrphanPost, postCounts, topCategoriesByPosts } from '../utils/postCategories.js'
 
 const posts      = ref([])
 const categories = ref([])
@@ -176,12 +196,17 @@ const recentPosts = computed(() =>
     .slice(0, 8)
 )
 
-function postCountFor(catId) {
-  return posts.value.filter(p => p.category_id === catId).length
-}
+const loadedFlags = ref({ posts: false, categories: false })
+const loaded = computed(() => loadedFlags.value.posts && loadedFlags.value.categories)
+const validIds = computed(() => categoryIdSet(categories.value))
+const isOrphan = (p) => isOrphanPost(p, validIds.value)
+// Main categories count their subcategories' posts too; orphans separately.
+const orphanCount = computed(() => postCounts(posts.value, categories.value).orphanCount)
+const topCategories = computed(() => topCategoriesByPosts(posts.value, categories.value, 6))
+const labels = computed(() => new Map(categoryOptions(categories.value).map(o => [o.id, o.label])))
 
 function categoryName(catId) {
-  return categories.value.find(c => c.id === catId)?.name ?? '—'
+  return labels.value.get(catId) ?? '—'
 }
 
 function cssColor(hex) { return flutterColorToCss(hex) }
@@ -196,9 +221,11 @@ onMounted(() => {
   unsubs.push(
     onSnapshot(collection(db, 'posts'), snap => {
       posts.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      loadedFlags.value = { ...loadedFlags.value, posts: true }
     }),
     onSnapshot(collection(db, 'categories'), snap => {
       categories.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      loadedFlags.value = { ...loadedFlags.value, categories: true }
     }),
     onSnapshot(collection(db, 'users'), snap => {
       users.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -210,6 +237,15 @@ onUnmounted(() => unsubs.forEach(u => u()))
 </script>
 
 <style scoped>
+.orphan-banner {
+  padding: 12px 16px; border-radius: 10px; background: #fff7ed; border: 1px solid #fdba74;
+  color: #9a3412; font-size: 13px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+}
+.orphan-row .cat-name, .orphan-row .post-count { color: #c2410c; }
+.orphan-chip {
+  display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  background: #ffedd5; color: #c2410c;
+}
 .overview {
   display: flex;
   flex-direction: column;

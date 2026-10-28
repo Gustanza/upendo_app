@@ -87,19 +87,47 @@
           <p>
             This category has {{ deleteTargetChildren.length }}
             subcategor{{ deleteTargetChildren.length === 1 ? 'y' : 'ies' }}
-            ({{ deleteTargetChildren.map(c => c.name).join(', ') }}).
-            Delete or reassign them first.
+            ({{ deleteTargetChildren.map(c => c.name).join(', ') }})<template v-if="impact && impact.postCount">
+            and {{ impact.postCount }} post{{ impact.postCount === 1 ? '' : 's' }} in it and its subcategories</template>.
+            Delete or reassign the subcategories (and move their posts) first.
           </p>
           <div class="confirm-actions">
             <button class="btn-cancel" @click="deleteTarget = null">Close</button>
           </div>
         </template>
-        <template v-else>
+        <template v-else-if="checkingPosts">
           <h3>Delete "{{ deleteTarget.name }}"?</h3>
-          <p>This will remove the category. Posts linked to it will keep their category ID but the category won't exist anymore.</p>
+          <p>Checking whether any posts use this category…</p>
+        </template>
+        <template v-else-if="impact && impact.postCount">
+          <h3>"{{ deleteTarget.name }}" still has posts</h3>
+          <p>{{ deleteBlockMessage(deleteTarget.name, impact) }}</p>
+          <div class="move-box">
+            <label class="move-label">Move {{ impact.postCount === 1 ? 'it' : 'all ' + impact.postCount }} to:</label>
+            <CategoryPicker v-model="moveTarget" :categories="categories" :exclude="[deleteTarget.id]" :size="6" />
+            <button class="btn-move" :disabled="moving || !moveTarget" @click="movePostsOut">
+              {{ moving ? 'Moving… ' + moveProgress.done + '/' + moveProgress.total : 'Move ' + impact.postCount + ' post' + (impact.postCount === 1 ? '' : 's') }}
+            </button>
+          </div>
+          <label class="ack">
+            <input v-model="acknowledged" type="checkbox" />
+            Delete anyway — I understand {{ impact.postCount }} post{{ impact.postCount === 1 ? '' : 's' }} will be hidden in the app.
+          </label>
+          <p v-if="deleteError" class="delete-error">{{ deleteError }}</p>
           <div class="confirm-actions">
             <button class="btn-cancel" @click="deleteTarget = null">Cancel</button>
-            <button class="btn-confirm-delete" :disabled="deleting" @click="doDelete">
+            <button class="btn-confirm-delete" :disabled="deleting || !acknowledged" @click="doDelete">
+              {{ deleting ? 'Deleting…' : 'Delete anyway' }}
+            </button>
+          </div>
+        </template>
+        <template v-else>
+          <h3>Delete "{{ deleteTarget.name }}"?</h3>
+          <p v-if="impact">No posts use this category. This will remove it permanently.</p>
+          <p v-if="deleteError" class="delete-error">{{ deleteError }}</p>
+          <div class="confirm-actions">
+            <button class="btn-cancel" @click="deleteTarget = null">Cancel</button>
+            <button class="btn-confirm-delete" :disabled="deleting || !impact" @click="doDelete">
               {{ deleting ? 'Deleting…' : 'Delete' }}
             </button>
           </div>
@@ -120,10 +148,14 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { collection, onSnapshot, deleteDoc, doc } from 'firebase/firestore'
+import { collection, onSnapshot, deleteDoc, doc, getDocs, query, where, writeBatch, serverTimestamp } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
 import { flutterColorToCss, iconChar } from '../utils/iconData.js'
 import CategoryFormModal from '../components/CategoryFormModal.vue'
+import CategoryPicker from '../components/CategoryPicker.vue'
+import { deleteImpact, deleteBlockMessage, reassignPosts, categoryIdSet } from '../utils/postCategories.js'
+import { chunk } from '../utils/categoryGroups.js'
+import { describeFirebaseError } from '../utils/firebaseErrors.js'
 
 const PAGE_SIZE       = 5
 const categories      = ref([])
@@ -207,7 +239,79 @@ function openEdit(cat) {
   showModal.value = true
 }
 
-function confirmDelete(cat) { deleteTarget.value = cat }
+// ── Delete guard ──
+// Deleting a category that still had posts left them pointing at a missing
+// id, which hides them in the app (this is how every Topics tab went
+// empty). Count them first and offer to move them.
+const impact        = ref(null)
+const checkingPosts = ref(false)
+const acknowledged  = ref(false)
+const deleteError   = ref(null)
+const moveTarget    = ref('')
+const moving        = ref(false)
+const moveProgress  = ref({ done: 0, total: 0 })
+
+// Posts whose category_id is the category or one of its subcategories
+// ('in' queries take at most 30 values).
+async function postsUsing(cat) {
+  const ids = [cat.id, ...childrenOf(cat).map(c => c.id)]
+  const found = []
+  for (const part of chunk(ids, 30)) {
+    const snap = await getDocs(query(collection(db, 'posts'), where('category_id', 'in', part)))
+    found.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  }
+  return found
+}
+
+async function checkImpact(cat) {
+  checkingPosts.value = true
+  deleteError.value = null
+  try {
+    impact.value = deleteImpact(cat.id, categories.value, await postsUsing(cat))
+  } catch (e) {
+    impact.value = null
+    deleteError.value = describeFirebaseError(e, 'Checking posts of this category')
+  } finally {
+    checkingPosts.value = false
+  }
+}
+
+function confirmDelete(cat) {
+  deleteTarget.value = cat
+  impact.value = null
+  acknowledged.value = false
+  moveTarget.value = ''
+  checkImpact(cat)
+}
+
+async function movePostsOut() {
+  if (!impact.value || !deleteTarget.value) return
+  moving.value = true
+  deleteError.value = null
+  const target = moveTarget.value
+  const cat = deleteTarget.value
+  try {
+    const res = await reassignPosts({
+      postIds: [...impact.value.ownPosts, ...impact.value.subPosts].map(p => p.id),
+      targetId: target,
+      validIds: categoryIdSet(categories.value.filter(c => c.id !== cat.id)),
+      onProgress: (p) => { moveProgress.value = p },
+      commitChunk: async (ids) => {
+        const batch = writeBatch(db)
+        ids.forEach(id => batch.update(doc(db, 'posts', id), { category_id: target, updated_at: serverTimestamp() }))
+        await batch.commit()
+      },
+    })
+    if (res.error) deleteError.value = res.done + ' of ' + res.total + ' moved. ' + describeFirebaseError(res.error, 'Moving the rest')
+  } catch (e) {
+    deleteError.value = describeFirebaseError(e, 'Moving posts')
+  } finally {
+    moving.value = false
+  }
+  const err = deleteError.value
+  await checkImpact(cat)
+  if (err) deleteError.value = err
+}
 
 async function doDelete() {
   if (!deleteTarget.value) return
@@ -217,9 +321,19 @@ async function doDelete() {
   // so this is a cheap belt-and-suspenders guard rather than a new read.
   if (childrenOf(deleteTarget.value).length > 0) return
   deleting.value = true
+  deleteError.value = null
   try {
+    // Re-count right before deleting: posts may have been added meanwhile.
+    const fresh = deleteImpact(deleteTarget.value.id, categories.value, await postsUsing(deleteTarget.value))
+    if (fresh.postCount && (!acknowledged.value || fresh.postCount > (impact.value?.postCount ?? 0))) {
+      impact.value = fresh
+      acknowledged.value = false
+      return
+    }
     await deleteDoc(doc(db, 'categories', deleteTarget.value.id))
     deleteTarget.value = null
+  } catch (e) {
+    deleteError.value = describeFirebaseError(e, 'Deleting the category')
   } finally {
     deleting.value = false
   }
@@ -400,6 +514,17 @@ function onSaved() {
 }
 .page-btn:hover:not(:disabled) { border-color: #8b2942; color: #8b2942; }
 .page-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Delete guard */
+.move-box { display: flex; flex-direction: column; gap: 8px; margin: 0 0 14px; }
+.move-label { font-size: 13px; font-weight: 600; color: #374151; }
+.btn-move {
+  align-self: flex-start; padding: 8px 14px; border: none; border-radius: 8px;
+  background: #8b2942; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn-move:disabled { opacity: .5; cursor: not-allowed; }
+.ack { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: #9a3412; margin: 0 0 14px; }
+.delete-error { color: #c81e1e !important; font-size: 13px; }
 
 /* Delete confirmation modal */
 .modal-overlay {

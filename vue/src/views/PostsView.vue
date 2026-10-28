@@ -1,6 +1,14 @@
 <template>
   <div class="posts-page">
 
+    <!-- Orphaned posts banner -->
+    <div v-if="!loading && orphanCount" class="orphan-banner" role="alert">
+      <strong>{{ orphanCount }} post{{ orphanCount === 1 ? ' is' : 's are' }} not linked to any existing category and
+        {{ orphanCount === 1 ? 'is' : 'are' }} hidden in the app.</strong>
+      Their category was deleted. Select them and move them to a category.
+      <button v-if="activeFilter !== 'orphans'" class="banner-btn" @click="setFilter('orphans')">Show them</button>
+    </div>
+
     <!-- Toolbar -->
     <div class="toolbar">
       <div class="filters">
@@ -8,10 +16,10 @@
           v-for="f in typeFilters"
           :key="f.value"
           class="filter-btn"
-          :class="{ active: activeFilter === f.value }"
+          :class="{ active: activeFilter === f.value, warn: f.value === 'orphans' }"
           @click="setFilter(f.value)"
         >
-          {{ f.label }}
+          {{ f.label }}<template v-if="f.value === 'orphans'"> ({{ orphanCount }})</template>
         </button>
       </div>
       <div class="toolbar-right">
@@ -21,6 +29,22 @@
         </button>
       </div>
     </div>
+
+    <!-- Bulk move -->
+    <div v-if="selected.size" class="bulk-bar">
+      <div class="bulk-info">
+        <strong>{{ selected.size }} selected</strong>
+        <button class="link-btn" @click="clearSelection">Clear</button>
+      </div>
+      <div class="bulk-move">
+        <span class="bulk-label">Move to:</span>
+        <CategoryPicker v-model="moveTarget" :categories="categories" :size="5" />
+        <button class="btn-new" :disabled="moving || !moveTarget" @click="moveSelected">
+          {{ moving ? `Moving… ${moveProgress.done}/${moveProgress.total}` : `Move ${selected.size} post${selected.size === 1 ? '' : 's'}` }}
+        </button>
+      </div>
+    </div>
+    <p v-if="moveMessage" class="move-msg" :class="{ error: moveError }">{{ moveMessage }}</p>
 
     <!-- Loading -->
     <div v-if="loading" class="state-box">
@@ -38,8 +62,19 @@
       <table class="posts-table">
         <thead>
           <tr>
+            <th class="check-cell">
+              <input
+                type="checkbox"
+                :checked="allFilteredSelected"
+                :indeterminate.prop="someFilteredSelected && !allFilteredSelected"
+                :disabled="!filteredPosts.length"
+                title="Select every post in this view"
+                @change="toggleAllFiltered"
+              />
+            </th>
             <th>Thumbnail</th>
             <th>Title</th>
+            <th>Category</th>
             <th>Type</th>
             <th>Featured</th>
             <th>Hot</th>
@@ -47,10 +82,13 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="posts.length === 0">
-            <td colspan="6" class="empty">No posts found.</td>
+          <tr v-if="pagePosts.length === 0">
+            <td colspan="8" class="empty">No posts found.</td>
           </tr>
-          <tr v-for="post in posts" :key="post.id" class="clickable-row" @click="selectedPost = post">
+          <tr v-for="post in pagePosts" :key="post.id" class="clickable-row" @click="selectedPost = post">
+            <td class="check-cell" @click.stop>
+              <input type="checkbox" :checked="selected.has(post.id)" @change="toggleOne(post.id)" />
+            </td>
             <td>
               <img v-if="post.thumbnail" :src="post.thumbnail" class="thumb" alt="" />
               <div v-else class="thumb-placeholder">?</div>
@@ -58,6 +96,12 @@
             <td>
               <p class="post-title">{{ post.title }}</p>
               <p class="post-subtitle">{{ post.subtitle }}</p>
+            </td>
+            <td>
+              <span v-if="isOrphan(post)" class="orphan-badge" :title="post.category_id ? `category_id ${post.category_id} does not exist` : 'No category set'">
+                Category deleted — reassign
+              </span>
+              <span v-else class="cat-label">{{ labelOf(post.category_id) }}</span>
             </td>
             <td>
               <span class="type-badge" :class="post.type">{{ post.type || 'video' }}</span>
@@ -84,13 +128,13 @@
 
       <!-- Pagination bar -->
       <div class="pagination">
-        <span class="page-info">Page {{ currentPage }}</span>
+        <span class="page-info">Page {{ currentPage }} of {{ pageCount }} · {{ filteredPosts.length }} post{{ filteredPosts.length === 1 ? '' : 's' }}</span>
         <div class="page-btns">
-          <button class="page-btn" :disabled="!hasPrev || loading" @click="prevPage">
+          <button class="page-btn" :disabled="!hasPrev" @click="pageIndex--">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg>
             Previous
           </button>
-          <button class="page-btn" :disabled="!hasNext || loading" @click="nextPage">
+          <button class="page-btn" :disabled="!hasNext" @click="pageIndex++">
             Next
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
@@ -118,6 +162,7 @@
       <div class="confirm-modal">
         <h3>Delete "{{ deleteTarget.title }}"?</h3>
         <p>This will permanently remove the post. This can't be undone.</p>
+        <p v-if="deleteError" class="move-msg error">{{ deleteError }}</p>
         <div class="confirm-actions">
           <button class="btn-cancel" @click="deleteTarget = null">Cancel</button>
           <button class="btn-confirm-delete" :disabled="deleting" @click="doDelete">
@@ -131,31 +176,41 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { collection, getDocs, query, orderBy, where, startAfter, limit, deleteDoc, doc } from 'firebase/firestore'
+// All posts and categories are loaded live (a few hundred docs at most) so
+// orphaned posts — category_id pointing at a deleted category, which the
+// app never shows — can be counted, filtered, selected and moved in bulk.
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { collection, onSnapshot, deleteDoc, doc, writeBatch, serverTimestamp } from 'firebase/firestore'
 import { db } from '../fireconfigs.js'
 import PostDetailModal from '../components/PostDetailModal.vue'
 import PostFormModal   from '../components/PostFormModal.vue'
+import CategoryPicker  from '../components/CategoryPicker.vue'
+import { categoryOptions } from '../utils/categoryOptions.js'
+import { categoryIdSet, isOrphanPost, reassignPosts } from '../utils/postCategories.js'
+import { describeFirebaseError } from '../utils/firebaseErrors.js'
 
 const PAGE_SIZE = 10
 
+const route = useRoute()
 const posts        = ref([])
+const categories   = ref([])
 const loading      = ref(true)
 const error        = ref(null)
-const activeFilter = ref('all')
+const activeFilter = ref(route.query.filter === 'orphans' ? 'orphans' : 'all')
 const selectedPost = ref(null)
 const formPost     = ref(undefined)
 const deleteTarget = ref(null)
 const deleting     = ref(false)
+const deleteError  = ref(null)
+const pageIndex    = ref(0)
 
-// Cursor stack: each entry is the Firestore DocumentSnapshot that starts that page.
-// Index 0 = null (page 1 needs no startAfter cursor).
-const pageStarts  = ref([null])
-const pageIndex   = ref(0)
-const hasNext     = ref(false)
-
-const currentPage = computed(() => pageIndex.value + 1)
-const hasPrev     = computed(() => pageIndex.value > 0)
+const selected     = ref(new Set())
+const moveTarget   = ref('')
+const moving       = ref(false)
+const moveProgress = ref({ done: 0, total: 0 })
+const moveMessage  = ref('')
+const moveError    = ref(false)
 
 const typeFilters = [
   { label: 'All',   value: 'all' },
@@ -163,71 +218,110 @@ const typeFilters = [
   { label: 'Audio', value: 'audio' },
   { label: 'PDF',   value: 'pdf' },
   { label: 'Poll',  value: 'poll' },
+  { label: 'Posts without a valid category', value: 'orphans' },
 ]
 
-function buildQuery(cursor) {
-  const constraints = []
-  if (activeFilter.value !== 'all') constraints.push(where('type', '==', activeFilter.value))
-  constraints.push(orderBy('title'))
-  if (cursor) constraints.push(startAfter(cursor))
-  constraints.push(limit(PAGE_SIZE + 1)) // fetch one extra to know if next page exists
-  return query(collection(db, 'posts'), ...constraints)
-}
+let loaded = { posts: false, categories: false }
+const unsubs = []
+onMounted(() => {
+  const fail = (what) => (e) => { error.value = describeFirebaseError(e, `Loading ${what}`); loading.value = false }
+  const done = (what) => { loaded[what] = true; if (loaded.posts && loaded.categories) loading.value = false }
+  unsubs.push(
+    onSnapshot(collection(db, 'posts'), (snap) => {
+      posts.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+      done('posts')
+    }, fail('posts')),
+    onSnapshot(collection(db, 'categories'), (snap) => {
+      categories.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      done('categories')
+    }, fail('categories')),
+  )
+})
+onUnmounted(() => unsubs.forEach((u) => u()))
 
-async function loadPage() {
-  loading.value = true
-  error.value   = null
-  try {
-    const cursor = pageStarts.value[pageIndex.value]
-    const snap   = await getDocs(buildQuery(cursor))
-    const docs   = snap.docs
+const validIds   = computed(() => categoryIdSet(categories.value))
+const labels     = computed(() => new Map(categoryOptions(categories.value).map((o) => [o.id, o.label])))
+const isOrphan   = (p) => isOrphanPost(p, validIds.value)
+const labelOf    = (id) => labels.value.get(id) ?? '—'
+const orphanCount = computed(() => posts.value.filter(isOrphan).length)
 
-    hasNext.value = docs.length > PAGE_SIZE
-    const visible = hasNext.value ? docs.slice(0, PAGE_SIZE) : docs
-
-    posts.value = visible.map(d => ({ id: d.id, ...d.data() }))
-
-    // Cache the first doc of the next page so we can navigate forward
-    if (hasNext.value && pageStarts.value.length === pageIndex.value + 1) {
-      pageStarts.value.push(docs[PAGE_SIZE - 1]) // last visible doc is the cursor for next page
-    }
-  } catch (e) {
-    error.value = e.message
-  } finally {
-    loading.value = false
-  }
-}
-
-function resetPagination() {
-  pageStarts.value = [null]
-  pageIndex.value  = 0
-  hasNext.value    = false
-}
+const filteredPosts = computed(() => {
+  const f = activeFilter.value
+  if (f === 'all') return posts.value
+  if (f === 'orphans') return posts.value.filter(isOrphan)
+  return posts.value.filter((p) => (p.type || 'video') === f)
+})
+const pageCount   = computed(() => Math.max(1, Math.ceil(filteredPosts.value.length / PAGE_SIZE)))
+const currentPage = computed(() => pageIndex.value + 1)
+const hasPrev     = computed(() => pageIndex.value > 0)
+const hasNext     = computed(() => pageIndex.value + 1 < pageCount.value)
+const pagePosts   = computed(() => filteredPosts.value.slice(pageIndex.value * PAGE_SIZE, (pageIndex.value + 1) * PAGE_SIZE))
+watch(pageCount, (n) => { if (pageIndex.value >= n) pageIndex.value = n - 1 })
 
 function setFilter(val) {
   if (val === activeFilter.value) return
   activeFilter.value = val
-  resetPagination()
-  loadPage()
+  pageIndex.value = 0
+  clearSelection()
 }
 
-async function nextPage() {
-  if (!hasNext.value) return
-  pageIndex.value++
-  await loadPage()
+// ── selection ──
+const allFilteredSelected  = computed(() => filteredPosts.value.length > 0 && filteredPosts.value.every((p) => selected.value.has(p.id)))
+const someFilteredSelected = computed(() => filteredPosts.value.some((p) => selected.value.has(p.id)))
+function toggleOne(id) {
+  const next = new Set(selected.value)
+  next.has(id) ? next.delete(id) : next.add(id)
+  selected.value = next
 }
+function toggleAllFiltered() {
+  const next = new Set(selected.value)
+  if (allFilteredSelected.value) filteredPosts.value.forEach((p) => next.delete(p.id))
+  else filteredPosts.value.forEach((p) => next.add(p.id))
+  selected.value = next
+}
+function clearSelection() { selected.value = new Set(); moveMessage.value = '' }
 
-async function prevPage() {
-  if (pageIndex.value === 0) return
-  pageIndex.value--
-  await loadPage()
+// ── bulk move ──
+async function moveSelected() {
+  moving.value = true
+  moveMessage.value = ''
+  moveError.value = false
+  const target = moveTarget.value
+  try {
+    const res = await reassignPosts({
+      postIds: [...selected.value],
+      targetId: target,
+      validIds: validIds.value,
+      onProgress: (p) => { moveProgress.value = p },
+      commitChunk: async (ids) => {
+        const batch = writeBatch(db)
+        ids.forEach((id) => batch.update(doc(db, 'posts', id), { category_id: target, updated_at: serverTimestamp() }))
+        await batch.commit()
+      },
+    })
+    if (res.error) {
+      moveError.value = true
+      moveMessage.value = `${res.done} of ${res.total} moved. ` + describeFirebaseError(res.error, 'Moving the rest')
+      // keep only the ones that weren't moved selected
+      selected.value = new Set([...selected.value].filter((id) => posts.value.find((p) => p.id === id)?.category_id !== target))
+    } else {
+      moveMessage.value = `Moved ${res.done} post${res.done === 1 ? '' : 's'} to "${labelOf(target)}". They now show in the app.`
+      selected.value = new Set()
+    }
+  } catch (e) {
+    moveError.value = true
+    moveMessage.value = describeFirebaseError(e, 'Moving posts')
+  } finally {
+    moving.value = false
+  }
 }
 
 function openCreate()    { formPost.value = null }
 function openEdit(post)  { formPost.value = post }
-function onSaved()       { resetPagination(); loadPage() }
+function onSaved()       { /* live listener refreshes the list */ }
 
-function confirmDelete(post) { deleteTarget.value = post }
+function confirmDelete(post) { deleteTarget.value = post; deleteError.value = null }
 
 async function doDelete() {
   if (!deleteTarget.value) return
@@ -235,17 +329,42 @@ async function doDelete() {
   try {
     await deleteDoc(doc(db, 'posts', deleteTarget.value.id))
     deleteTarget.value = null
-    resetPagination()
-    await loadPage()
+  } catch (e) {
+    deleteError.value = describeFirebaseError(e, 'Deleting the post')
   } finally {
     deleting.value = false
   }
 }
-
-loadPage()
 </script>
 
 <style scoped>
+.orphan-banner {
+  padding: 12px 16px; border-radius: 10px; background: #fff7ed; border: 1px solid #fdba74;
+  color: #9a3412; font-size: 13px; line-height: 1.5; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.banner-btn, .link-btn {
+  border: 1px solid #fdba74; background: #fff; color: #9a3412; border-radius: 6px;
+  padding: 3px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.link-btn { border-color: #dde0ee; color: #555; }
+.filter-btn.warn { border-color: #fdba74; color: #9a3412; }
+.filter-btn.warn.active { background: #c2410c; border-color: #c2410c; color: #fff; }
+.bulk-bar {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; justify-content: space-between;
+  padding: 12px 16px; background: #fff; border: 1px solid #e8eaf0; border-radius: 12px;
+}
+.bulk-info { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.bulk-move { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+.bulk-label { font-size: 13px; color: #6b7280; padding-top: 8px; }
+.btn-new:disabled { opacity: .5; cursor: not-allowed; }
+.move-msg { margin: 0; font-size: 13px; color: #15803d; }
+.move-msg.error { color: #c81e1e; }
+.check-cell { width: 36px; }
+.orphan-badge {
+  display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  background: #ffedd5; color: #c2410c; white-space: nowrap;
+}
+.cat-label { font-size: 13px; color: #374151; }
 .posts-page { display: flex; flex-direction: column; gap: 20px; }
 
 .toolbar { display: flex; align-items: center; justify-content: space-between; }
