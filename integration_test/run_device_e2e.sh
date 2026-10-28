@@ -11,16 +11,17 @@
 #   - seeded: FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
 #             node functions/test/device/seed-device-e2e.js
 #
-# Usage: bash integration_test/run_device_e2e.sh [device-serial] [screenshot-dir]
+# Usage: bash integration_test/run_device_e2e.sh [device-serial] [screenshot-dir] [extra flutter test args, e.g. --plain-name J6]
 set -u
 SERIAL="${1:-emulator-5554}"
 SHOTS="${2:-./build/device-shots}"
+shift $(( $# < 2 ? $# : 2 ))
 ADB="${ADB:-$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe}"
 mkdir -p "$SHOTS"
 cd "$(dirname "$0")/.."
 
 flutter test integration_test/e2e_journeys_test.dart -d "$SERIAL" \
-  --dart-define=USE_FIREBASE_EMULATORS=true 2>&1 |
+  --dart-define=USE_FIREBASE_EMULATORS=true "$@" 2>&1 |
 while IFS= read -r line; do
   printf '%s\n' "$line"
   case "$line" in

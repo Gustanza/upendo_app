@@ -542,6 +542,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get chatDeleted => 'Discussion supprimée';
 
   @override
+  String get deleteChat => 'Supprimer la discussion';
+
+  @override
   String get noMessagesYet =>
       'Aucun message pour le moment. Soyez le premier à écrire !';
 

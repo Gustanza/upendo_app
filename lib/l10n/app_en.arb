@@ -154,6 +154,7 @@
   "deleteChatTitle": "Delete chat with {name}?",
   "deleteChatBody": "This chat will be deleted for you only. The other person will still see all messages. If they send you a new message, the chat comes back with only the new messages.",
   "chatDeleted": "Chat deleted",
+  "deleteChat": "Delete chat",
   "noMessagesYet": "No messages yet. Be the first to write!",
   "noMessagesStartConversation": "No messages yet. Start the conversation!",
   "writeMessageHint": "Write a message...",

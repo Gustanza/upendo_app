@@ -539,6 +539,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatDeleted => 'Chat deleted';
 
   @override
+  String get deleteChat => 'Delete chat';
+
+  @override
   String get noMessagesYet => 'No messages yet. Be the first to write!';
 
   @override

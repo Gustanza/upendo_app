@@ -103,6 +103,36 @@ Future<void> waitGone(WidgetTester t, Finder f, {int seconds = 15}) async {
   fail('still showing $f');
 }
 
+/// Real-time long-press (tester.longPress relies on fake time, which the
+/// fully-live integration binding doesn't advance).
+Future<void> realLongPress(WidgetTester t, Finder f) async {
+  final g = await t.startGesture(t.getCenter(f));
+  await wait(t, 900);
+  await g.up();
+  await wait(t, 300);
+}
+
+/// Real-time tap (down, short hold, up) — avoids mixing tester.tap's
+/// synthetic timing with the real-time gestures above.
+Future<void> realTap(WidgetTester t, Finder f) async {
+  final g = await t.startGesture(t.getCenter(f));
+  await wait(t, 120);
+  await g.up();
+  await wait(t, 600);
+}
+
+/// Real-time horizontal swipe in small steps.
+Future<void> realSwipe(WidgetTester t, Finder f, double dx) async {
+  final g = await t.startGesture(t.getCenter(f));
+  for (var i = 0; i < 20; i++) {
+    await g.moveBy(Offset(dx / 20, 0));
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+    await t.pump();
+  }
+  await g.up();
+  await wait(t, 800);
+}
+
 Future<void> show(WidgetTester t, Widget home) async {
   await t.pumpWidget(NguvuYaUpendoApp(key: UniqueKey(), home: home));
   await wait(t, 600);
@@ -442,5 +472,102 @@ void main() {
     await shot(t, 'j5_account_referral_code');
     await LocaleController.instance.setLanguage('fr'); // left as fr for the restart check
     results.add('J5 PASS');
+  });
+
+  // ── Journey 6: delete a private chat from INSIDE the chat (⋮ menu), plus
+  // the inbox list's swipe and long-press — client: "inbox conversations
+  // can not be deleted".
+  testWidgets('J6 delete chat: ⋮ menu in chat, list swipe, long-press', (t) async {
+    final b = uids[emailB]!;
+    final sw = l10nFor('sw');
+    await LocaleController.instance.setLanguage('sw');
+    final svc = ConversationService();
+    await signIn(emailA);
+    final convId = await svc.getOrCreateConversation(otherUid: b, otherName: 'Bob Tester');
+    await signIn(emailB);
+    await svc.sendMessage(convId, 'J6 before delete $runTag');
+
+    Finder bobTile() => find.widgetWithText(ListTile, 'Bob Tester');
+    Finder dialogButton(String label) =>
+        find.descendant(of: find.byType(AlertDialog), matching: find.text(label));
+
+    // Brings the chat back for A with a new message from B; returns its text.
+    Future<String> bobWrites(String tag) async {
+      await signIn(emailB);
+      await show(t, const ConversationsScreen());
+      await waitFor(t, find.text('Alice Tester'), why: 'B still sees the chat ($tag)');
+      final text = 'J6 $tag $runTag';
+      await svc.sendMessage(convId, text);
+      await signIn(emailA);
+      await show(t, const ConversationsScreen());
+      await waitFor(t, bobTile(), seconds: 40, why: 'chat reappears for A ($tag)');
+      return text;
+    }
+
+    // ── (a) ⋮ menu inside the real ConversationScreen ──
+    await signIn(emailA);
+    await show(t, const ConversationsScreen());
+    await waitFor(t, bobTile());
+    await t.tap(bobTile());
+    await waitFor(t, find.byType(ConversationScreen));
+    await waitFor(t, find.text('J6 before delete $runTag'));
+    expect(find.byKey(const Key('chatMenu')), findsOneWidget);
+    await t.tap(find.byKey(const Key('chatMenu')));
+    await waitFor(t, find.text(sw.deleteChat), why: 'menu item "${sw.deleteChat}"');
+    await shot(t, 'j6_chat_menu_open_sw');
+    await t.tap(find.text(sw.deleteChat));
+    await waitFor(t, find.byType(AlertDialog));
+    expect(find.text(sw.deleteChatTitle('Bob Tester')), findsOneWidget);
+    expect(find.text(sw.deleteChatBody), findsOneWidget);
+    await shot(t, 'j6_chat_confirm_dialog_sw');
+    await realTap(t, dialogButton(sw.delete));
+    await waitGone(t, find.byType(ConversationScreen));
+    results.add('J6a ⋮ → ${sw.deleteChat} → ${sw.delete}: ConversationScreen popped');
+    await waitGone(t, bobTile());
+    await waitFor(t, find.text(sw.chatDeleted), seconds: 5, why: 'snackbar');
+    await shot(t, 'j6_list_after_menu_delete');
+    final conv = (await db.doc('conversations/$convId').get()).data()!;
+    expect((conv['deletedAt'] as Map).containsKey(uids[emailA]), isTrue);
+
+    final back = await bobWrites('after menu delete');
+    await t.tap(bobTile());
+    await waitFor(t, find.text(back));
+    expect(find.text('J6 before delete $runTag'), findsNothing, reason: 'old messages stay hidden');
+    await shot(t, 'j6_reappeared_only_new');
+    results.add('J6a B unaffected; B\'s new message brought it back with only the new message');
+
+    // ── (b) list: long-press → Cancel keeps it, long-press → Futa deletes ──
+    await show(t, const ConversationsScreen());
+    await waitFor(t, bobTile());
+    await realLongPress(t, bobTile());
+    await waitFor(t, find.byType(AlertDialog));
+    await realTap(t, dialogButton(sw.cancel));
+    await wait(t, 1500);
+    expect(bobTile(), findsOneWidget, reason: 'cancel keeps the chat');
+    // Fresh tree: in the fully-live test binding a second synthetic long-press
+    // on the same InkWell isn't recognised (verified by hand with adb that a
+    // second real long-press after Cancel works in the app).
+    await show(t, const ConversationsScreen());
+    await waitFor(t, bobTile());
+    await realLongPress(t, bobTile());
+    await waitFor(t, find.byType(AlertDialog));
+    await shot(t, 'j6_longpress_dialog_sw');
+    await realTap(t, dialogButton(sw.delete));
+    await waitGone(t, bobTile());
+    results.add('J6b long-press: cancel keeps, confirm deletes');
+    await bobWrites('after long-press');
+
+    // ── (c) list: swipe left → confirm ──
+    await realSwipe(t, bobTile(), -700);
+    await waitFor(t, find.byType(AlertDialog), why: 'swipe confirm dialog');
+    await shot(t, 'j6_swipe_dialog_sw');
+    await realTap(t, dialogButton(sw.delete));
+    await waitGone(t, bobTile());
+    results.add('J6c swipe: confirm deletes');
+    final last = await bobWrites('after swipe');
+    await t.tap(bobTile());
+    await waitFor(t, find.text(last));
+    expect(find.text('J6 after long-press $runTag'), findsNothing);
+    results.add('J6 PASS');
   });
 }

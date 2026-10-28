@@ -527,6 +527,9 @@ class AppLocalizationsSw extends AppLocalizations {
   String get chatDeleted => 'Mazungumzo yamefutwa';
 
   @override
+  String get deleteChat => 'Futa mazungumzo';
+
+  @override
   String get noMessagesYet => 'Hakuna ujumbe bado. Kuwa wa kwanza kuandika!';
 
   @override

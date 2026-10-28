@@ -1024,6 +1024,12 @@ abstract class AppLocalizations {
   /// **'Mazungumzo yamefutwa'**
   String get chatDeleted;
 
+  /// No description provided for @deleteChat.
+  ///
+  /// In sw, this message translates to:
+  /// **'Futa mazungumzo'**
+  String get deleteChat;
+
   /// No description provided for @noMessagesYet.
   ///
   /// In sw, this message translates to:

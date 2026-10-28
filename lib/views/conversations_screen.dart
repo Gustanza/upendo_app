@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/l10n.dart';
 import '../models/conversation_model.dart';
 import '../services/conversation_service.dart';
+import '../utils/delete_chat.dart';
 import '../utils/display_name.dart';
 import '../utils/time_ago.dart';
 import 'conversation_screen.dart';
@@ -35,46 +36,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     await prefs.setInt('conv_last_seen', DateTime.now().millisecondsSinceEpoch);
   }
 
-  Future<bool> _confirmDelete(String otherName) async {
-    final l10n = context.l10n;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.deleteChatTitle(otherName)),
-        content: Text(l10n.deleteChatBody),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.delete,
-                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
-    return confirmed == true;
-  }
-
-  // Hides the chat for this user only — the other participant keeps the
-  // full history, and a new message from them brings it back here.
-  Future<bool> _deleteForMe(ConversationModel c, String otherName) async {
-    if (!await _confirmDelete(otherName)) return false;
-    try {
-      await _service.deleteConversationForMe(c.id);
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(context.l10n.chatDeleted)));
-      }
-      return true;
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(context.l10n.deleteFailed('$e'))));
-      }
-      return false;
-    }
-  }
+  Future<bool> _deleteForMe(ConversationModel c, String otherName) =>
+      confirmAndDeleteChatForMe(context,
+          conversationId: c.id, otherName: otherName, service: _service);
 
   @override
   Widget build(BuildContext context) {

@@ -154,6 +154,7 @@
   "deleteChatTitle": "Supprimer la discussion avec {name} ?",
   "deleteChatBody": "Cette discussion sera supprimée uniquement pour vous. L'autre personne verra toujours tous les messages. S'il vous écrit à nouveau, la discussion réapparaîtra avec seulement les nouveaux messages.",
   "chatDeleted": "Discussion supprimée",
+  "deleteChat": "Supprimer la discussion",
   "noMessagesYet": "Aucun message pour le moment. Soyez le premier à écrire !",
   "noMessagesStartConversation": "Aucun message pour le moment. Lancez la conversation !",
   "writeMessageHint": "Écrire un message...",

@@ -304,6 +304,7 @@
   },
   "deleteChatBody": "Mazungumzo haya yatafutwa kwako tu. Mwenzako bado ataona ujumbe wote. Akikutumia ujumbe mpya, mazungumzo yatarudi yakiwa na ujumbe mpya tu.",
   "chatDeleted": "Mazungumzo yamefutwa",
+  "deleteChat": "Futa mazungumzo",
   "noMessagesYet": "Hakuna ujumbe bado. Kuwa wa kwanza kuandika!",
   "noMessagesStartConversation": "Hakuna ujumbe bado. Anza mazungumzo!",
   "writeMessageHint": "Andika ujumbe...",
